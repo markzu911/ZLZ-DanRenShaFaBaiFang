@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "cloudflared": "^0.7.1"
+  },
+  "_npx": {
+    "packages": [
+      "cloudflared"
+    ]
+  }
+}

@@ -271,6 +271,13 @@ export default function App() {
     setAddedElements([]);
   };
 
+  const handleViewModeChange = (nextViewMode: ViewMode) => {
+    setViewMode(nextViewMode);
+    if (mode === "room" && nextViewMode !== viewMode) {
+      resetAnalysis();
+    }
+  };
+
   const handleAnalyze = async () => {
     if (!sceneImage) return;
     setIsAnalyzing(true);
@@ -691,7 +698,7 @@ export default function App() {
                       <button
                         key={view.id}
                         type="button"
-                        onClick={() => setViewMode(view.id)}
+                        onClick={() => handleViewModeChange(view.id)}
                         className={`rounded-[8px] p-3 text-left transition-all ${
                           viewMode === view.id
                             ? "bg-[#171819] text-white shadow-md"

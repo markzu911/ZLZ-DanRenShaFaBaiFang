@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "node --env-file=.env --use-env-proxy ./node_modules/tsx/dist/cli.mjs server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
