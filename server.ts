@@ -10,7 +10,14 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 dotenv.config();
 
 const PORT = Number(process.env.PORT || 3000);
-const SAAS_ORIGIN = process.env.SAAS_ORIGIN || "https://aibigtree.com";
+const SAAS_ORIGIN = stripTrailingSlash(process.env.SAAS_ORIGIN || "https://aibigtree.com");
+const SAAS_ENDPOINTS = {
+  launch: resolveSaasEndpoint("SAAS_LAUNCH_URL", "/api/tool/launch"),
+  verify: resolveSaasEndpoint("SAAS_VERIFY_URL", "/api/tool/verify"),
+  consume: resolveSaasEndpoint("SAAS_CONSUME_URL", "/api/tool/consume"),
+  uploadToken: resolveSaasEndpoint("SAAS_UPLOAD_TOKEN_URL", "/api/upload/direct-token"),
+  uploadCommit: resolveSaasEndpoint("SAAS_UPLOAD_COMMIT_URL", "/api/upload/commit"),
+};
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-flash-latest";
 const GEMINI_PROXY = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || "";
@@ -22,6 +29,17 @@ type ImageSize = "1K" | "2K" | "4K";
 type SceneMode = "room" | "style";
 type ViewMode = "wide" | "mid" | "close";
 type StyleId = "minimal" | "luxury";
+
+function stripTrailingSlash(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function resolveSaasEndpoint(envKey: string, defaultPath: string) {
+  const configured = process.env[envKey]?.trim();
+  const pathOrUrl = configured || defaultPath;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  return `${SAAS_ORIGIN}${pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`}`;
+}
 
 const WINDOW_FRONT_PRIORITY =
   "最高优先级落位：上传单人沙发必须物理落在窗户/落地窗/窗帘正前方的室内采光区，沙发背侧或一侧靠近窗墙、窗台、落地窗内侧或窗帘线。该规则高于视角、构图、美观、参考图复刻和场景分析。为了配合从窗户侧向室内拍摄，不要求窗户/窗帘成为沙发背后的整面背景；只需在画面边缘、侧后方或前景窄边露出窗帘线、窗框、窗台、窗墙或柔和窗光作为落位证据。禁止把沙发放到房间中央、地毯中央、茶几旁中心、电视前方、柜门前方或通道中央，禁止只把窗户当远处背景而沙发离窗很远。";
@@ -189,7 +207,7 @@ async function readJsonResponse(res: Response) {
 
 async function verifyBeforeGenerate(userId?: string, toolId?: string) {
   if (!userId || !toolId) return;
-  const res = await fetch(`${SAAS_ORIGIN}/api/tool/verify`, {
+  const res = await fetch(SAAS_ENDPOINTS.verify, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, toolId }),
@@ -208,14 +226,14 @@ async function saveResultImageToSaas({
   imageBuffer: Buffer;
   fileName: string;
 }) {
-  const consumeRes = await fetch(`${SAAS_ORIGIN}/api/tool/consume`, {
+  const consumeRes = await fetch(SAAS_ENDPOINTS.consume, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, toolId }),
   });
   await readJsonResponse(consumeRes);
 
-  const tokenRes = await fetch(`${SAAS_ORIGIN}/api/upload/direct-token`, {
+  const tokenRes = await fetch(SAAS_ENDPOINTS.uploadToken, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -228,18 +246,18 @@ async function saveResultImageToSaas({
     }),
   });
   const token = await readJsonResponse(tokenRes);
+  if (!token.uploadUrl || !token.objectKey) {
+    throw new Error("SaaS upload token response missing uploadUrl or objectKey");
+  }
 
   const uploadRes = await fetch(token.uploadUrl, {
     method: token.method || "PUT",
-    headers: {
-      ...token.headers,
-      "Content-Type": "image/png",
-    },
+    headers: token.headers || { "Content-Type": "image/png" },
     body: imageBuffer,
   });
   if (!uploadRes.ok) throw new Error(`OSS upload failed: ${uploadRes.status}`);
 
-  const commitRes = await fetch(`${SAAS_ORIGIN}/api/upload/commit`, {
+  const commitRes = await fetch(SAAS_ENDPOINTS.uploadCommit, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -251,10 +269,21 @@ async function saveResultImageToSaas({
     }),
   });
   const commit = await readJsonResponse(commitRes);
-  if (!commit.savedToRecords) {
+  const image = commit.image || commit;
+  if (!commit.savedToRecords && !image.savedToRecords) {
     throw new Error(commit.error || "Failed to save record to SaaS");
   }
-  return commit.image || commit;
+  if (!(image.recordId ?? commit.recordId) || !(image.url ?? commit.url)) {
+    throw new Error("SaaS commit response missing recordId or url");
+  }
+  return {
+    ...image,
+    recordId: image.recordId ?? commit.recordId,
+    url: image.url ?? commit.url,
+    fileName: image.fileName ?? commit.fileName ?? token.fileName,
+    fileSize: image.fileSize ?? commit.fileSize ?? imageBuffer.byteLength,
+    savedToRecords: true,
+  };
 }
 
 const stylePrompts: Record<StyleId, string> = {
@@ -368,6 +397,7 @@ async function startServer() {
       imageModel: IMAGE_MODEL,
       textModel: TEXT_MODEL,
       hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+      saasOrigin: SAAS_ORIGIN,
     });
   });
 
@@ -378,14 +408,17 @@ async function startServer() {
   app.post("/api/tool/launch", async (req, res) => {
     try {
       const { userId, toolId } = req.body;
-      const saasRes = await fetch(`${SAAS_ORIGIN}/api/tool/launch`, {
+      if (!userId || !toolId) {
+        return res.status(400).json({ success: false, message: "userId and toolId are required" });
+      }
+      const saasRes = await fetch(SAAS_ENDPOINTS.launch, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, toolId }),
       });
       res.json(await readJsonResponse(saasRes));
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(502).json({ success: false, message: error.message });
     }
   });
 
@@ -603,9 +636,9 @@ async function startServer() {
           });
         } catch (saasError: any) {
           console.error("SaaS Save Error:", saasError.message);
-          return res.json({
-            imageUrl: dataUrl,
-            saasError: saasError.message,
+          return res.status(502).json({
+            error: saasError.message || "SaaS result image save failed",
+            saasSaveFailed: true,
             prompt: generationPrompt,
           });
         }

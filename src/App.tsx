@@ -45,6 +45,10 @@ interface SceneAnalysis {
 interface HistoryItem {
   id: string;
   imageUrl: string;
+  recordId?: string;
+  fileName?: string;
+  fileSize?: number;
+  saasInfo?: Record<string, unknown>;
   prompt?: string;
   mode: Mode;
   styleId?: StyleId;
@@ -124,6 +128,20 @@ function readFileAsDataUrl(file: File) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+async function readJsonResponse(res: Response) {
+  const text = await res.text();
+  let data: any = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { error: text.slice(0, 300) };
+  }
+  if (!res.ok || data.success === false) {
+    throw new Error(data.error || data.message || `Request failed: ${res.status}`);
+  }
+  return data;
 }
 
 function UploadBox({ title, hint, image, onUpload, tall = false }: UploadBoxProps) {
@@ -248,7 +266,7 @@ export default function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, toolId }),
         });
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (data.success) {
           setUserData(data.data?.user || null);
           setToolData(data.data?.tool || null);
@@ -300,8 +318,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sceneImage, viewMode }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "场景分析失败");
+      const data = await readJsonResponse(res);
       setAnalysis(data);
       setSelectedElements(data.elements || []);
       setAddedElements([]);
@@ -339,8 +356,7 @@ export default function App() {
           toolId: saasConfig.toolId,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "图像生成失败");
+      const data = await readJsonResponse(res);
       if (!data.imageUrl) throw new Error(data.text || "Gemini 未返回图像");
       if (data.prompt) {
         console.log("Final Gemini Image Prompt:", data.prompt);
@@ -349,6 +365,10 @@ export default function App() {
       const item: HistoryItem = {
         id: `${Date.now()}`,
         imageUrl: data.imageUrl,
+        recordId: data.recordId,
+        fileName: data.saasInfo?.fileName,
+        fileSize: data.saasInfo?.fileSize,
+        saasInfo: data.saasInfo,
         prompt: data.prompt || "",
         mode,
         styleId: mode === "style" ? styleId : undefined,
