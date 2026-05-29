@@ -24,7 +24,7 @@ import { AnimatePresence, motion } from "motion/react";
 type Mode = "room" | "style";
 type Resolution = "1K" | "2K" | "4K";
 type AspectRatio = "1:1" | "3:4" | "4:3" | "16:9";
-type ViewMode = "wide" | "mid" | "close" | "model";
+type ViewMode = "wide" | "mid" | "close";
 type StyleId = "minimal" | "luxury";
 
 interface SceneAnalysis {
@@ -45,9 +45,11 @@ interface SceneAnalysis {
 interface HistoryItem {
   id: string;
   imageUrl: string;
+  prompt?: string;
   mode: Mode;
   styleId?: StyleId;
   viewMode: ViewMode;
+  withModel: boolean;
   ratio: AspectRatio;
   resolution: Resolution;
   createdAt: string;
@@ -73,7 +75,16 @@ const VIEW_OPTIONS: Array<{
   { id: "wide", label: "远景", description: "全屋清晰主角", icon: Expand },
   { id: "mid", label: "中近景", description: "局部空间中景", icon: LayoutGrid },
   { id: "close", label: "近景", description: "局部细节特写", icon: Camera },
-  { id: "model", label: "模特", description: "生活方式带人", icon: User },
+];
+
+const MODEL_OPTIONS: Array<{
+  value: boolean;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+}> = [
+  { value: false, label: "无模特", description: "纯产品场景", icon: X },
+  { value: true, label: "有模特", description: "生活方式带人", icon: User },
 ];
 
 const STYLE_OPTIONS: Array<{
@@ -208,10 +219,11 @@ export default function App() {
   const [manualElement, setManualElement] = useState("");
   const [styleId, setStyleId] = useState<StyleId>("minimal");
   const [viewMode, setViewMode] = useState<ViewMode>("wide");
+  const [withModel, setWithModel] = useState(false);
   const [resolution, setResolution] = useState<Resolution>("1K");
   const [ratio, setRatio] = useState<AspectRatio>("1:1");
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<HistoryItem | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -219,7 +231,7 @@ export default function App() {
   const [userData, setUserData] = useState<{ name?: string; integral?: number } | null>(null);
   const [toolData, setToolData] = useState<{ integral?: number } | null>(null);
 
-  const currentResult = history[0]?.imageUrl;
+  const currentResult = history[0];
   const activeStyle = STYLE_OPTIONS.find((style) => style.id === styleId) || STYLE_OPTIONS[0];
 
   const canGenerate = useMemo(() => {
@@ -316,6 +328,7 @@ export default function App() {
           sceneImage: mode === "room" ? sceneImage : undefined,
           styleId,
           viewMode,
+          withModel,
           ratio,
           resolution,
           sceneAnalysis: analysis,
@@ -329,19 +342,24 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "图像生成失败");
       if (!data.imageUrl) throw new Error(data.text || "Gemini 未返回图像");
+      if (data.prompt) {
+        console.log("Final Gemini Image Prompt:", data.prompt);
+      }
 
       const item: HistoryItem = {
         id: `${Date.now()}`,
         imageUrl: data.imageUrl,
+        prompt: data.prompt || "",
         mode,
         styleId: mode === "style" ? styleId : undefined,
         viewMode,
+        withModel,
         ratio,
         resolution,
         createdAt: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
       };
       setHistory((items) => [item, ...items].slice(0, 24));
-      setPreviewImage(data.imageUrl);
+      setPreviewItem(item);
     } catch (generateError: any) {
       setError(generateError.message || "图像生成失败");
     } finally {
@@ -533,7 +551,7 @@ export default function App() {
                             ["透视", analysis.perspectiveCues || analysis.cameraAngle],
                             ["大小", analysis.recommendedScale],
                             ["朝向", analysis.recommendedOrientation],
-                            ["模特", analysis.modelInteractionSuggestion],
+                            ...(withModel ? ([["模特", analysis.modelInteractionSuggestion]] as Array<[string, string | undefined]>) : []),
                           ]
                             .filter(([, value]) => Boolean(value))
                             .map(([label, value]) => (
@@ -659,13 +677,14 @@ export default function App() {
                         <button
                           type="button"
                           key={item.id}
-                          onClick={() => setPreviewImage(item.imageUrl)}
+                          onClick={() => setPreviewItem(item)}
                           className="group relative overflow-hidden rounded-[8px] bg-[#efede7] text-left shadow-sm"
                         >
                           <img src={item.imageUrl} alt="生成历史" className="aspect-square w-full object-cover" />
                           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-white">
-                            <p className="text-xs font-bold">
-                              {VIEW_OPTIONS.find((view) => view.id === item.viewMode)?.label} · {item.resolution} · {item.ratio}
+                              <p className="text-xs font-bold">
+                              {VIEW_OPTIONS.find((view) => view.id === item.viewMode)?.label} ·{" "}
+                              {item.withModel ? "有模特" : "无模特"} · {item.resolution} · {item.ratio}
                             </p>
                             <p className="text-[11px] text-white/72">{item.createdAt}</p>
                           </div>
@@ -691,7 +710,9 @@ export default function App() {
                   <Camera className="h-5 w-5" />
                   <p className="text-sm font-extrabold">视角选择</p>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-4">
+                  <p className="mb-2 text-xs font-bold text-[#4a4f52]">视角</p>
+                  <div className="grid grid-cols-3 gap-2">
                   {VIEW_OPTIONS.map((view) => {
                     const Icon = view.icon;
                     return (
@@ -710,9 +731,36 @@ export default function App() {
                         <span className={`mt-1 block text-[11px] ${viewMode === view.id ? "text-white/70" : "text-[#77736b]"}`}>
                           {view.description}
                         </span>
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <p className="mb-2 text-xs font-bold text-[#4a4f52]">是否需要模特</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MODEL_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      const active = withModel === option.value;
+                      return (
+                        <button
+                          key={option.label}
+                          type="button"
+                          onClick={() => setWithModel(option.value)}
+                          className={`rounded-[8px] p-3 text-left transition-all ${
+                            active ? "bg-[#171819] text-white shadow-md" : "bg-[#f2f0ea] text-[#4a4f52] hover:bg-[#e7e5df]"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                          <span className="mt-2 block text-sm font-extrabold">{option.label}</span>
+                          <span className={`mt-1 block text-[11px] ${active ? "text-white/70" : "text-[#77736b]"}`}>
+                            {option.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </section>
 
@@ -770,19 +818,20 @@ export default function App() {
                 <div className="mt-3 space-y-2 text-xs leading-5 text-[#6f6a60]">
                   <p>模式：{mode === "room" ? "上传房间场景融入沙发" : `选择风格直接生成 · ${activeStyle.title}`}</p>
                   <p>视角：{VIEW_OPTIONS.find((view) => view.id === viewMode)?.label}</p>
+                  <p>模特：{withModel ? "需要模特" : "不需要模特"}</p>
                   <p>输出：{resolution} / {ratio}</p>
                 </div>
               </section>
 
               {currentResult && (
                 <section className="rounded-[8px] border border-[#ebe7df] bg-white p-3 shadow-sm">
-                  <button type="button" onClick={() => setPreviewImage(currentResult)} className="block w-full overflow-hidden rounded-[8px]">
-                    <img src={currentResult} alt="最新结果" className="aspect-square w-full object-cover" />
+                  <button type="button" onClick={() => setPreviewItem(currentResult)} className="block w-full overflow-hidden rounded-[8px]">
+                    <img src={currentResult.imageUrl} alt="最新结果" className="aspect-square w-full object-cover" />
                   </button>
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setPreviewImage(currentResult)}
+                      onClick={() => setPreviewItem(currentResult)}
                       className="flex flex-1 items-center justify-center gap-2 rounded-[8px] bg-[#efede7] px-3 py-2 text-sm font-bold text-[#4a4f52]"
                     >
                       <Expand className="h-4 w-4" />
@@ -790,7 +839,7 @@ export default function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => downloadImage(currentResult)}
+                      onClick={() => downloadImage(currentResult.imageUrl)}
                       className="flex flex-1 items-center justify-center gap-2 rounded-[8px] bg-[#171819] px-3 py-2 text-sm font-bold text-white"
                     >
                       <Download className="h-4 w-4" />
@@ -805,7 +854,7 @@ export default function App() {
       </main>
 
       <AnimatePresence>
-        {previewImage && (
+        {previewItem && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -814,22 +863,40 @@ export default function App() {
           >
             <button
               type="button"
-              onClick={() => setPreviewImage(null)}
+              onClick={() => setPreviewItem(null)}
               className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-[8px] bg-white/10 text-white hover:bg-white/20"
               aria-label="关闭预览"
             >
               <X className="h-6 w-6" />
             </button>
-            <div className="flex max-h-full max-w-5xl flex-col items-center gap-4">
-              <img src={previewImage} alt="生成结果预览" className="max-h-[82vh] max-w-full rounded-[8px] object-contain shadow-2xl" />
-              <button
-                type="button"
-                onClick={() => downloadImage(previewImage)}
-                className="flex items-center gap-2 rounded-[8px] bg-white px-6 py-3 text-sm font-extrabold text-[#171819]"
-              >
-                <Download className="h-5 w-5" />
-                下载生成图
-              </button>
+            <div className="grid max-h-full w-full max-w-[1380px] grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+              <div className="flex min-h-0 flex-col items-center justify-center gap-4">
+                <img
+                  src={previewItem.imageUrl}
+                  alt="生成结果预览"
+                  className="max-h-[78vh] max-w-full rounded-[8px] object-contain shadow-2xl"
+                />
+                <button
+                  type="button"
+                  onClick={() => downloadImage(previewItem.imageUrl)}
+                  className="flex items-center gap-2 rounded-[8px] bg-white px-6 py-3 text-sm font-extrabold text-[#171819]"
+                >
+                  <Download className="h-5 w-5" />
+                  下载生成图
+                </button>
+              </div>
+              <aside className="min-h-0 overflow-hidden rounded-[8px] bg-white text-[#1e2428] shadow-2xl">
+                <div className="border-b border-[#e6e1d8] px-4 py-3">
+                  <p className="text-sm font-extrabold">生图提示词</p>
+                  <p className="mt-1 text-xs text-[#77736b]">
+                    {VIEW_OPTIONS.find((view) => view.id === previewItem.viewMode)?.label} ·{" "}
+                    {previewItem.withModel ? "有模特" : "无模特"} · {previewItem.resolution} · {previewItem.ratio}
+                  </p>
+                </div>
+                <pre className="max-h-[72vh] overflow-auto whitespace-pre-wrap break-words p-4 text-xs leading-5 text-[#343a3d]">
+                  {previewItem.prompt || "暂无提示词记录。旧历史图可能是在保存提示词之前生成的。"}
+                </pre>
+              </aside>
             </div>
           </motion.div>
         )}

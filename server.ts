@@ -20,8 +20,17 @@ installGeminiProxyFetch();
 type AspectRatio = "1:1" | "3:4" | "4:3" | "16:9";
 type ImageSize = "1K" | "2K" | "4K";
 type SceneMode = "room" | "style";
-type ViewMode = "wide" | "mid" | "close" | "model";
+type ViewMode = "wide" | "mid" | "close";
 type StyleId = "minimal" | "luxury";
+
+const WINDOW_FRONT_PRIORITY =
+  "最高优先级落位：上传单人沙发必须物理落在窗户/落地窗/窗帘正前方的室内采光区，沙发背侧或一侧靠近窗墙、窗台、落地窗内侧或窗帘线。该规则高于视角、构图、美观、参考图复刻和场景分析。为了配合从窗户侧向室内拍摄，不要求窗户/窗帘成为沙发背后的整面背景；只需在画面边缘、侧后方或前景窄边露出窗帘线、窗框、窗台、窗墙或柔和窗光作为落位证据。禁止把沙发放到房间中央、地毯中央、茶几旁中心、电视前方、柜门前方或通道中央，禁止只把窗户当远处背景而沙发离窗很远。";
+
+const WINDOW_SIDE_CAMERA =
+  "机位规则：相机位置可以为保持沙发同向而移动；先固定沙发位置和朝向，再移动相机到能看清产品的窗边侧前方、同向沙发的正前方或侧前方。相机实际仍在室内，靠近窗户/落地窗/窗帘这一侧或窗前采光区边缘；沙发应在机位对面或侧对面。相机只做水平旋转/水平摇镜，不做仰拍或俯冲，镜头轴线相对房间主轴约 35-45 度斜向室内，像从窗边斜看屋内。镜头轴线应从窗户/玻璃/窗帘侧或窗前采光区边缘看向沙发和室内家具，最终落到电视墙、柜体、内墙、会客区、地毯、灯具、绿植或屋内家具；画面尽头不能是窗户、落地窗、窗帘墙或窗外楼景。画面应像从窗边水平旋转约 40 度向屋内看，不是站在客厅里对着窗帘拍沙发，也不是沿着房间长轴一直拍到另一面窗户。窗户、窗帘、窗外景和玻璃反光只能占画面边缘或窄条，不能占据大面积前景或成为主体背景。不要从客厅深处朝窗户拍，不要把镜头朝室外拍，也不要让窗外楼景成为主体。";
+
+const SOFA_ORIENTATION_MATCH =
+  "已有沙发朝向硬锁：如果参考房间里有现有沙发、长沙发、贵妃位或清晰座位，先识别现有沙发的正面向量：靠背线的反方向、座面开口方向、扶手/抱枕朝向和茶几/电视墙相对关系共同决定它面向哪里。新生成的单人沙发必须把自己的正面向量锁定在同一方向扇区，和现有沙发大体平行、同向，只允许约 5-15 度自然偏角，用来形成真实摆放感。大于约 20 度的明显转向、90 度垂直、180 度反向、面对现有沙发、为了展示产品正面而把沙发转向镜头、在不跟随现有沙发同向的情况下明显面向相机，全部视为错误。不要为了构图或产品展示而改变沙发本体朝向；如果需要看到产品正面或侧面，只能移动相机到同向沙发的正前方或侧前方拍摄。此时画面可以看见正面或侧面，但原因必须是相机移动，沙发正面向量仍必须与现有沙发一致，不能以镜头为基准重新定向。只有在参考图没有可识别沙发时，才让单人沙发朝向电视墙、会客区或主要活动区。";
 
 function parseDataUrl(image: string) {
   const match = image.match(/^data:([^;]+);base64,(.*)$/);
@@ -43,7 +52,7 @@ function readJsonBlock(text: string) {
 }
 
 function buildFallbackSceneAnalysis(viewMode: ViewMode, error?: any) {
-  const base = {
+  return {
     roomType: "客厅",
     style: "现代高端客厅",
     lighting: "大面积窗户自然光与室内暖色灯带混合照明",
@@ -51,57 +60,33 @@ function buildFallbackSceneAnalysis(viewMode: ViewMode, error?: any) {
     colorPalette: "中性色、米色地毯、浅色地面、黑色皮质沙发和冷暖混合光",
     cameraAngle: "平视或轻微俯拍",
     perspectiveCues: "参考地毯边缘、地砖缝、长沙发边线、电视墙和窗户框线判断地面透视与消失点",
+    placementSuggestion: `${WINDOW_FRONT_PRIORITY} 可靠近已有长沙发靠窗一端，但不必贴着已有长沙发扶手。${SOFA_ORIENTATION_MATCH} ${WINDOW_SIDE_CAMERA} 按当前视角规则执行：${viewPrompts[viewMode]}`,
+    recommendedScale: "根据参考房间中的长沙发、地毯、地砖缝、灯具、窗高、柜体和通道宽度判断真实单人椅比例。",
+    recommendedOrientation: `如果有现有沙发，先识别现有沙发的靠背线、座面开口、扶手方向和茶几/电视墙关系，再让上传单人沙发与现有沙发同向，只允许约 5-15 度自然偏角；禁止反向、垂直、面对现有沙发或为了镜头改变朝向，然后通过移动机位来获得需要的画面角度。否则根据会客区、电视墙、地毯方向、地面透视线和可用动线决定沙发朝向。${SOFA_ORIENTATION_MATCH}`,
     modelInteractionSuggestion: "如加入模特，身体应自然坐靠，脚部与地面或脚踏形成真实接触阴影",
     elements: ["地毯", "地面", "窗户", "长沙发", "灯光", "墙面"],
     analysisSource: "fallback",
     analysisWarning: error?.cause?.code || error?.message || "Gemini analysis unavailable",
   };
+}
 
-  if (viewMode === "close") {
-    return {
-      ...base,
-      placementSuggestion:
-        "近景只做沙发局部细节特写，使用地毯边缘、地砖缝、窗光或灯光作为少量场景线索，不展示完整客厅。",
-      recommendedScale:
-        "只显示扶手、坐垫、靠背缝线、脚部或侧拉杆等局部，画面中的产品局部可以较大，但隐含尺寸仍为正常单人沙发。",
-      recommendedOrientation:
-        "局部朝向应跟随地面透视和窗光方向，避免像棚拍抠图贴到场景上。",
-    };
-  }
+function sanitizeSceneAnalysisForPrompt(sceneAnalysis?: any) {
+  if (!sceneAnalysis || typeof sceneAnalysis !== "object") return {};
+  const {
+    placementSuggestion: _placementSuggestion,
+    recommendedScale: _recommendedScale,
+    recommendedOrientation: _recommendedOrientation,
+    ...safeAnalysis
+  } = sceneAnalysis;
+  return safeAnalysis;
+}
 
-  if (viewMode === "mid") {
-    return {
-      ...base,
-      placementSuggestion:
-        "中近景采用局部 seating area 裁切，可只展示地毯、长沙发一侧、窗帘/窗光、灯具或绿植局部；单椅应放在地毯上的自然休闲椅位置，避免房间几何中心和动线。",
-      recommendedScale:
-        "单人沙发在局部中景中可占画面高度约36%-50%，宽度约28%-42%，但必须明显窄于长沙发并保持真实单人椅尺寸。",
-      recommendedOrientation:
-        "沙发应略微朝向电视墙、长沙发或会客区，角度跟随地毯和地砖透视；上传产品图只作为款式参考，生成时可以改变朝向。",
-    };
-  }
-
-  if (viewMode === "model") {
-    return {
-      ...base,
-      placementSuggestion:
-        "沙发和模特应放在地毯或会客区的自然座位位置，留出脚部落地和身体接触空间。",
-      recommendedScale:
-        "沙发按真实单人椅尺寸处理，座高接近成人膝盖，扶手接近肘部，靠背不应大到吞没人体。",
-      recommendedOrientation:
-        "沙发朝向应与会客区一致，模特坐姿、手脚接触和阴影要自然。",
-    };
-  }
-
-  return {
-    ...base,
-    placementSuggestion:
-      "远景保留完整空间，但单人沙发应放在自然会客区，例如地毯上、长沙发旁或面向电视墙/长沙发的位置，避免远窗边小模型感和房间正中心。",
-      recommendedScale:
-      "远景中单人沙发约占画面高度16%-24%、宽度12%-20%，清晰可辨但小于长沙发，背高接近或略高于长沙发靠背。",
-    recommendedOrientation:
-      "沙发通常与电视墙或长沙发形成15-35度自然夹角，跟随地面透视与会客动线；上传产品图方向不应锁定最终朝向。",
-  };
+function buildScenePlacementContext(sceneAnalysis?: any) {
+  if (!sceneAnalysis || typeof sceneAnalysis !== "object") return "无额外场景落位分析。";
+  const placement = sceneAnalysis.placementSuggestion || "未提供";
+  const scale = sceneAnalysis.recommendedScale || "未提供";
+  const orientation = sceneAnalysis.recommendedOrientation || "未提供";
+  return `场景分析落位参考（仅在不违反房间融入专用规则时使用；如有冲突，必须忽略这里并执行最高优先级落位硬规则：沙发物理落在窗户/落地窗/窗帘正前方；如果房间里有现有沙发，必须先判断现有沙发正面向量，再让上传单人沙发与现有沙发同向，只允许约 5-15 度自然偏角；禁止让上传沙发反向、垂直、面对现有沙发或为了镜头改变朝向；机位可以移动到同向沙发的正前方或侧前方，相机在窗边或窗前采光区边缘水平旋转约 35-45 度斜向室内拍，画面尽头不能是窗户/窗帘，屋内家具是主背景）：placementSuggestion=${placement}；recommendedScale=${scale}；recommendedOrientation=${orientation}。`;
 }
 
 function isNetworkTimeoutError(error: any) {
@@ -274,20 +259,27 @@ async function saveResultImageToSaas({
 
 const stylePrompts: Record<StyleId, string> = {
   minimal:
-    "high-end minimalist ecommerce furniture campaign for a La-Z-Boy Indian single recliner in fully extended reclining state. Premium contemporary interior or refined outdoor-lounge inspired setting, warm natural daylight, clean architectural lines, textured rug, subtle natural materials, linen or travertine tones, curated side props, generous negative space, editorial catalog composition, no clutter. Lighting design: large soft side key light, gentle warm fill, controlled highlights on leather, soft contact shadows, polished but natural floor/rug texture, premium commercial retouching.",
+    "高端极简电商家具场景。为 La-Z-Boy Indian 单人躺椅生成舒展状态的商业图：现代室内或高级休闲空间，温暖自然光，干净建筑线条，质感地毯，自然材质，克制软装，画面整洁，有适度留白。光线柔和、有方向，上传产品的面料/皮革材质表现受控，接触阴影自然，整体像精修家居画册。",
   luxury:
-    "luxury high-end ecommerce furniture campaign for a La-Z-Boy Indian single recliner in fully extended reclining state. Sophisticated premium living room, boutique hotel lounge, luxury villa corner, or elevated resort terrace mood; stone or marble details, sculptural lamp, refined metal accents, handmade rug, elegant wall art, layered warm ambient lighting, cinematic natural highlights. Lighting design: soft directional window light plus warm practical lights, 1:3 contrast ratio, glossy leather highlights controlled and elegant, deep but soft shadows, premium editorial furniture photography.",
+    "奢华高端电商家具场景。为 La-Z-Boy Indian 单人躺椅生成舒展状态的商业图：高级客厅、精品酒店休息区或别墅角落氛围，石材/金属/艺术灯/手工地毯/装饰画等精致元素，暖色层次灯光与自然窗光结合。画面优雅、质感强，阴影柔和，上传产品的面料/皮革反光或纹理高级但不过曝。",
 };
 
 const viewPrompts: Record<ViewMode, string> = {
   wide:
-    "远景: Wide-angle interior room shot from a pulled-back camera position. This is the same room and same sofa placement logic as mid view; only the camera moves farther back and wider. Use a 24-30mm wide-angle lens feeling, camera height 1.35-1.55m, level verticals, moderate depth of field at f/5.6-f/8, and complete-room composition. Show the room, main furniture, floor/rug, walls, windows/doors or balcony area when present, and the relationship between the single sofa and surrounding furniture. Placement priority: first place the single sofa near the window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface when reasonable. Only if that area blocks a passage, door swing, cabinet opening, TV viewing line, traffic flow, or creates an obviously unreasonable layout, use the second priority: place it beside the existing main sofa / couch side within the conversation area. The chair should be fully visible and readable, correctly scaled as one-person furniture, with floor contact and realistic shadows. It should not be a close-up or medium product portrait.",
+    `远景图：先确定沙发固定落点，再把相机后退并使用较广角的室内远景构图，完整呈现房间、主要家具和沙发摆放关系。远景只改变相机位置、焦段和取景范围，不改变沙发落点、朝向和与窗帘/窗墙/窗户的真实空间关系。沙发是正常单人椅比例，占画面高度约 16%-24%，完整可见但不主导画面。${WINDOW_FRONT_PRIORITY} ${SOFA_ORIENTATION_MATCH} ${WINDOW_SIDE_CAMERA} 远景可以看到完整空间，但必须能判断沙发位于窗前采光区；窗户/窗帘可以只在画面边缘或侧边作为落位证据，主视线仍应指向室内屋内家具，尽头不能是窗户或窗帘。可与已有长沙发保持合理距离，不必贴着已有沙发扶手。避免产品特写、沙发过大、过小或贴图感。`,
   mid:
-    "中近景: Medium interior product shot from the same room and same sofa placement logic as the wide view; only move the camera closer. Use a 40-55mm lens feeling, camera about 2.8-4 meters from the single sofa, camera height 1.25-1.5m, and natural perspective. Placement priority: first place the sofa near the window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface when reasonable, in the adjacent indoor seating zone near that light area, not centered directly in front of the glass wall and not blocking the view, walkway, couch, cabinet, or TV line. Only if the window/light placement is unreasonable, use the second priority: place the sofa beside the existing main sofa / couch side within the conversation area. This is a placement rule only, not a camera target: the camera must be on the indoor side of the sofa, shooting inward toward the room interior. The sofa itself should be angled to face inward toward the room / conversation area / couch / TV wall, not toward the window or exterior view. Compose from a side-front camera angle so the camera sees the sofa front and one side while the sofa still feels oriented into the room, not posed only for the camera. The sofa should occupy about 32-42% of image height and 24-34% of image width, clearly smaller than the multi-seat couch and not dominating the room. Show the sofa plus indoor context such as rug/floor, side table, lamp, plant, couch edge, wall art, cabinet, wall edge, curtain edge, or floor seams. Treat windows/balcony/light surfaces only as light sources and placement anchors; keep them out of frame when possible, or show only a narrow edge or soft light spill. Avoid giant foreground recliner, sofa centered in front of the window, exterior-window background, sofa facing the window, straight-on frontal view, back-facing view, and wide full-room view.",
+    `中近景：先按最高优先级落位硬规则确定同一个沙发固定落点和沙发朝向，再把相机移动到更近的室内靠窗侧边、同向沙发的正前方或侧前方拍摄，形成中近景构图；即使用户直接选择中近景，也不能重新选择沙发落点或为了镜头改变沙发方向。中近景只表示相机更近、画面裁切更紧、焦段更集中，不允许移动沙发本体。${WINDOW_FRONT_PRIORITY} ${SOFA_ORIENTATION_MATCH} 不要再把它限制到已有长沙发扶手外侧。沙发占画面高度约 32%-42%、宽度约 24%-34%。${WINDOW_SIDE_CAMERA} 中近景画面应拍到上传沙发和屋内一些物品，例如地毯、地板、边几、灯具、绿植、已有长沙发局部、电视墙、柜体、墙面或软装；这些屋内物品必须成为主要背景和视线终点。画面可以是相机相对同向沙发约 20-35 度的前侧三分之四视角，或在窗边空间受限时从同向沙发正前方略偏侧拍；这里的“前侧”只描述相机位置，不代表把沙发转向镜头。不是沿房间长轴直拍；如果参考房间已有沙发，则上传单人沙发必须和现有沙发同向，只允许相对现有沙发轻微转角，产品可见性通过移动机位解决。窗户只作为落位锚点和光源证据出现，可以在画面边缘或侧后缘露出窄窄的窗帘线、部分窗框、窗台、窗墙或柔和窗光；不要让窗帘墙、玻璃或窗外楼景占据大面积前景或背景。画面必须保留至少一个位置锚点，用来证明沙发就在窗户前面；沙发底座应清楚落在窗前采光区，而不是客厅中央空地。避免全屋远景、近景特写、背面主视角、从室内深处朝窗户拍、对着窗帘拍产品、画面尽头是窗户或窗帘、沿房间长轴直拍、房间中央摆放、茶几旁中心、电视前方、通道中央、为了镜头旋转沙发或比例失真。`,
   close:
-    "近景: Close interior product shot from the same room, same sofa placement and same orientation logic as the mid view; only move the camera closer. The sofa position follows the mid-view requirement: if a window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface is a reasonable placement zone, keep the sofa there. Use close framing so the sofa subject occupies about 65-75% of the image area. The camera must be on the indoor side of the sofa, shooting inward toward the room interior rather than outward toward the window or exterior view. Compose the sofa diagonally toward the camera in a front three-quarter or side-front close view, showing material, silhouette, cushion shape, armrest, stitching, leather/fabric grain, seat-front panel, back cushion edge and partial soft furnishing details. Preserve enough environment information to prove the sofa is still in the room: rug/floor texture, indoor side table/lamp/plant/couch edge/wall art/cabinet/wall material/soft decor as softly blurred background or cropped edge cues. The close-view background must be indoor room objects, not an exterior-window view. Treat windows/balcony/light surfaces only as lighting sources; normally keep them outside the frame, and if unavoidable show only a very narrow cropped edge or soft light spill. Do not turn this into an isolated studio cutout or an environment-free macro shot.",
-  model:
-    "模特: Model shot: include one tasteful lifestyle model naturally sitting on or interacting with the armchair, face may be partially visible or turned away, posture relaxed and unposed, product remains the main subject and must not be blocked. Match the lighting direction and quality of the reference scene image exactly: if the scene has soft diffused side-window light, the model must be lit from the same direction with the same softness; if warm afternoon sun, the model carries the same warm tone and shadow angle; if cool overcast ambient, the model blends into that flat cool atmosphere. No artificial studio lighting that contradicts the scene. Use the model's body as a strict scale reference: the armchair must fit one adult naturally, with seat height around knee height, armrests around elbow height, backrest below or slightly above shoulder/head depending on the product, and believable leg/foot placement on the floor. The model's body weight, legs, hands, clothing folds and shadows must interact naturally with the chair fabric and structure. Clothing should be casual lifestyle attire in neutral tones that complement the chair color without clashing. Do not enlarge the chair to fit the composition; scale the chair, model, rug, floor, lamp and wall art consistently. The reference scene image provides atmosphere and lighting reference; walls and decor may be partially cropped, only the lighting environment must be preserved.",
+    `近景：先按最高优先级落位硬规则确定同一个沙发固定落点，再把相机继续靠近或改变裁切，突出沙发材质、轮廓、坐垫和局部软装细节，同时保留能证明固定落点的环境锚点；即使用户直接选择近景，也不能重新选择沙发落点。近景只移动相机和裁切画面，不移动沙发本体，不改变沙发与窗墙、窗帘线、窗户的相对位置，也不改变沙发与现有沙发的大体朝向关系。沙发主体占画面约 60%-72%，环境约 28%-40%；如果主体过大会裁掉室内背景和窗前落位证据，则优先保留这些锚点并略微缩小主体。${WINDOW_FRONT_PRIORITY} ${SOFA_ORIENTATION_MATCH} ${WINDOW_SIDE_CAMERA} 近景中窗户/阳台/采光面只是光源和落位锚点，画面必须出现窗帘线、窗框边缘、窗台、窗墙或柔和窗光中的至少一个，但只能作为边缘线索；背景优先保留地毯、地板、边几、灯具、墙面、柜体、电视墙或软装虚化，确保这是从窗边水平旋转约 40 度向室内拍的近景。避免棚拍抠图、纯微距、完整客厅远景、巨大椅子、房间中央摆放、对着窗帘拍产品、画面尽头是窗户或窗帘、沿房间长轴直拍、为了镜头改变沙发朝向或贴图感。`,
+};
+
+const styleViewPrompts: Record<ViewMode, string> = {
+  wide:
+    "风格远景：这是完整空间环境图，不是产品主视觉半身图。先在全新室内/生活方式场景中确定产品的自然陈列位置，再把相机明显后退，使用较广角的完整房间/完整休闲区构图。产品应位于中景或中远景，占画面高度约 12%-20%、宽度约 10%-20%，完整可见但不占据画面中心大部分；至少 60% 画面用于展示环境。必须看到明确的空间结构和多个尺度参照，例如大面积地面/地毯边界、墙面或窗帘、边几、灯具、绿植、装饰画、窗光或建筑线条。产品四周要有可见留白和落地区域，不能贴边或前景巨大。避免中近景、产品特写、只拍单椅和一小块地毯、空棚拍、产品过大、过小或漂浮。",
+  mid:
+    "风格中近景：这是完整产品主视觉环境图，不是完整房间远景，也不是局部特写。先确定产品在全新场景中的自然陈列位置，再把相机移动到更近的室内侧前方拍摄，使用中焦构图。中近景只表示相机更近、画面裁切更紧、焦段更集中，不表示重新摆放产品。产品必须完整可见，靠背、扶手、坐垫、脚踏、底座和整体轮廓都要进入画面，不裁掉主体边缘；产品占画面高度约 36%-48%、宽度约 28%-42%。环境占画面约 45%-60%，保留 2-4 个局部环境锚点，例如地毯/地板、边几、灯具、墙面、窗光、绿植或软装虚化。画面要像电商产品主图的环境版：产品清楚、比例真实、四周有呼吸空间。避免全屋远景、产品过小、完整空间展示、近景特写、局部裁切、产品贴边、正面平拍、背面视角、巨大产品或比例失真。",
+  close:
+    "风格近景：这是产品局部材质与结构特写，不是完整产品主视觉。先确定产品在全新场景中的自然陈列位置，再把相机明显靠近，使用近距离裁切突出材质、轮廓、坐垫鼓包、扶手、靠背分区、缝线、脚踏连接和面料/皮革纹理。近景只移动相机和裁切画面，不重新摆放产品。产品主体占画面约 72%-88%，环境只占约 12%-28%，作为柔和背景或边缘尺度参照。允许并鼓励裁切掉产品的少量边缘，例如只展示上半靠背+扶手+坐垫，或扶手+脚踏+坐垫细节；不要求完整看见整把椅子，但必须能识别为同一款上传产品。背景只保留地毯/地板、墙面、窗光、边几或软装的局部虚化，不展示完整房间关系。避免中近景完整产品图、完整椅子带大量环境、全屋远景、空棚拍、无法识别产品、漂浮脚踏或贴图感。",
 };
 
 function buildGenerationPrompt({
@@ -298,6 +290,7 @@ function buildGenerationPrompt({
   removedElements,
   addedElements,
   viewMode,
+  withModel,
 }: {
   mode: SceneMode;
   styleId: StyleId;
@@ -306,273 +299,56 @@ function buildGenerationPrompt({
   removedElements?: string[];
   addedElements?: string[];
   viewMode: ViewMode;
+  withModel: boolean;
 }) {
-  const styleViewPrompts: Record<ViewMode, string> = {
-    wide:
-      "远景: True wide full-room ecommerce interior photograph, not a medium product shot. Use a 22-28mm lens feeling, camera about 4.5-6.5 meters from the recliner, camera height 1.35-1.55m, level verticals, and moderate depth of field at f/5.6-f/8. Show a complete room or large living-area zone with visible floor, rug, walls, window/curtain or architectural opening, side table, lamp, art/plant/decor and enough negative space. The recliner must be fully visible and readable but placed in the middle ground as one furniture piece within the room, occupying only about 12-18% of image height and 14-22% of image width. The extended footrest may increase footprint, but the chair must still feel like normal single-person furniture, not a close-up hero product. Keep at least 55-70% of the image devoted to surrounding room context. Avoid cropped chair, detail shot, low-angle product portrait, close foreground recliner, shallow close-up blur, or composition where the recliner fills most of the frame.",
-    mid: viewPrompts.mid,
-    close: viewPrompts.close,
-    model: viewPrompts.model,
-  };
   const cameraViewRequirement = mode === "style" ? styleViewPrompts[viewMode] : viewPrompts[viewMode];
+  const safeSceneAnalysis = sanitizeSceneAnalysisForPrompt(sceneAnalysis);
+  const scenePlacementContext = buildScenePlacementContext(sceneAnalysis);
+  const modelRequirement = withModel
+    ? "模特要求：加入一位自然入镜的真人模特，与产品形成真实尺度对比，姿态生活化，不能遮挡产品主体。模特应真实坐在或自然互动于沙发/躺椅上，身体重量落在坐垫上，腿部、手部、衣褶和阴影接触可信。产品保持正常单人椅比例，不要为了适配模特而放大。避免站在旁边、坐在扶手上、漂浮、人体比例错误或产品轮廓被遮挡。"
+    : "模特要求：不要添加人物、人体局部、手、脚、倒影人物、海报人物或人形装饰；画面只展示产品和室内环境。";
 
   const shared = `
-Task: Generate a professional ecommerce image for a single-person sofa / armchair.
-Product fidelity is critical: preserve the uploaded sofa's exact shape, fabric texture, color, proportions, legs, seams, cushions and design language. Do not invent a different sofa.
-The uploaded product image is a product identity reference, not a fixed 2D cutout or fixed camera angle. You may and should rotate the sofa in 3D, change its yaw angle, show the other side, or infer a slightly different camera-facing view when the room layout requires it. Preserve the same product design, cushion structure, fabric, color, lever position logic and proportions, but do not copy the product photo's original facing direction if it conflicts with the scene.
-No text, logo overlays, watermarks, UI elements, price tags, labels, or banners.
-Use realistic lighting, contact shadows, material reflections, correct perspective and physically plausible scale.
-Lighting must match the scene: direction, softness, color temperature, shadow length, highlight intensity and ambient fill should be consistent across the sofa, room and model if present.
-Scale must be physically plausible: size the sofa according to the generated room's floor area, nearby furniture, wall height, camera distance and perspective. Avoid oversized, miniature, floating or pasted-on results.
-Orientation must match the generated scene: rotate and place the sofa according to the room layout, floor perspective lines, vanishing point, seating direction and nearby furniture arrangement. Scene logic has priority over the uploaded product photo's original angle.
-If a model is present, make the pose natural and physically plausible. The model should sit or interact with the sofa with believable weight, contact shadows, hand placement, leg position and clothing folds. Do not let the model cover the product's key silhouette.
-Output should look like a finished product-in-scene commercial photo for an online store.
-Camera/view requirement: ${cameraViewRequirement}
+任务：生成一张专业电商家具场景图，主体是单人沙发/单人椅。
+视角含义：当前视角只表示整张效果图的镜头远近、取景范围、焦段和裁切，不表示随意改变产品比例或让产品漂浮；先确定一个自然可信的产品落点，然后通过移动相机位置来形成远景、中近景或近景。
+产品一致性：严格保留上传沙发的外形轮廓、颜色、材质、扶手、靠背、坐垫、脚架、缝线和比例；只能在不违反朝向一致性和现有沙发同向规则的前提下根据空间逻辑确定朝向，不能换款、变形或生成不相关沙发。
+朝向一致性：${SOFA_ORIENTATION_MATCH}
+真实融合：新场景的相机高度、焦距、透视、景深、曝光、色温和自然光方向要自洽，并参考原图观感；沙发必须接受同一套房间光源，亮面、暗面、阴影方向、阴影软硬、材质高光、地面反射和环境色都要与周围家具一致。光线必须自然柔和，避免棚拍光、单独补光、过曝高光、硬阴影、冷暖色温不一致或不合理光源；沙发边缘不能有硬抠图边、发光边、白边或清晰度不一致。
+落地要求：先判断地面平面和墙地交界线，再把沙发稳定放在地面或地毯上，必须有接触点、接触阴影、遮挡关系和受力感，不能悬空、漂浮、穿模、半透明或像贴纸。
+禁止文字、logo、水印、价格牌、标签、UI、边框或说明标注。
+视角要求：${cameraViewRequirement}
+${modelRequirement}
 `;
 
-  const roomFramingStrategy =
-    viewMode === "wide"
-      ? `
-Scene framing strategy for wide view:
-Use the uploaded room image as the actual spatial reference. Preserve the room identity, main architecture, windows/doors/balcony/light surfaces, main furniture relationships, material palette and lighting direction.
-Compose a wider camera view of that same room, as if the photographer moved backward and used a wider interior lens. Do not turn it into a different room.
-Complete-room context is required: show the room, major furniture, floor/rug, walls, window/balcony/light area if present, and the sofa's placement relationship to them.
-Placement priority: first place the single sofa near the window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface by default.
-Only avoid the window/balcony/light area if the sofa would block a passage, door swing, cabinet opening, TV viewing line, traffic flow, or create an obviously unreasonable furniture layout. In that case, use the second priority: place it beside the existing main sofa / couch side within the conversation area.
-The sofa must remain a normal single-person chair, fully visible and readable, with believable floor contact, shadows and scale.`
-      : viewMode === "close"
-        ? `
-Scene framing strategy for close view:
-Use the uploaded room image as the actual spatial reference. Close view keeps the same sofa placement and orientation as mid view, only moving the camera closer.
-If the sofa is placed near a window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface, keep that placement, but set the close camera on the indoor side of the sofa and shoot inward toward the room interior, not outward toward the window or exterior view.
-The sofa subject should occupy about 65-75% of the image area. Keep roughly 25-35% for environment context.
-Use close composition to emphasize sofa material, outline, cushion volume, armrest, stitching, leather/fabric grain, seat-front panel, back cushion edge and partial soft furnishings.
-Keep enough environment information from the interior side: rug/floor texture and indoor objects such as side table, lamp, plant, couch edge, wall art, cabinet, wall material or soft decor as cropped edges or softly blurred background cues. Do not use the window, balcony or exterior view as the close-shot background. Treat the window/balcony/light surface only as a lighting source; normally keep it outside the frame, and if unavoidable show only a very narrow cropped edge or soft light spill.
-Orient the sofa diagonally toward the camera in a front three-quarter or side-front close view, matching the mid-view camera logic while moving closer.
-The sofa may be partially cropped, but the visible crop should still clearly belong to a normal single-person sofa in the same room. Avoid isolated studio cutouts, pure macro texture shots, or losing all room context.`
-      : viewMode === "mid"
-        ? `
-Scene framing strategy for mid view:
-Use the uploaded room image as the actual spatial reference. Mid view is the same room and same placement decision as wide view, shot from a closer camera position.
-Keep the sofa near the window/balcony/main natural-light area when that is the reasonable placement zone, but place it in the adjacent indoor seating zone rather than centered directly in front of the glass or blocking circulation, couch use, cabinets, TV line, or the main view. If the window/light placement is unreasonable, the next priority is beside the existing main sofa / couch side within the conversation area.
-Show a local seating-area crop photographed toward the room interior. The window/balcony/light area is only a placement anchor and light source; it should not become the camera target or background.
-Keep indoor scale references visible, such as rug boundary, floor seams, side table, lamp, plant, couch edge, wall art, cabinet, curtain edge, or wall edge.
-Set the camera on the indoor side of the sofa and shoot from a side-front angle. The sofa should be angled inward toward the room / conversation area / couch / TV wall, while the camera sits about 30-45 degrees off the sofa front so it can see the sofa front and one side. Avoid making the sofa face the window/exterior, straight-on frontal symmetry, back-facing views, and rear three-quarter views.
-Keep the sofa medium-sized in frame, not a giant foreground object; it should feel integrated into the seating area with visible floor/rug contact and clearance.`
-        : `
-Scene framing strategy for model view:
-Use the uploaded room image as an atmosphere and material reference rather than a strict layout copy.
-Keep lighting, color temperature, wall/floor material feeling and a few room cues, but compose a natural lifestyle scene around the sofa and model.
-The model, sofa and local scene should feel physically coherent and naturally photographed.
-Use human ergonomics to validate scale: one adult should sit comfortably without making the chair look like a giant throne or two-seat sofa. The model's knees, elbows, shoulders, feet and hip width should align with a real single armchair.`;
-
   if (mode === "room") {
-    const elementEditingRules =
-      viewMode === "close"
-        ? `
-Strict element editing instructions for close view:
-- In close view, selected scene elements are local environment cues from the same room and same placement as mid view.
-- Keep useful selected elements as cropped edges, textures, reflections, or softly blurred context cues when they fit the close framing: ${(selectedElements || []).join(", ") || "none"}.
-- Prioritize indoor cues that support the requested close shot: rug/floor texture, side table, lamp, plant, couch edge, cabinet, wall material, wall art, soft furnishing details, and only window light spill if useful. Do not prioritize visible window/balcony/exterior scenery in close view.
-- MUST DELETE these recognized scene elements completely from the final image if they would appear: ${(removedElements || []).join(", ") || "none"}. Remove the object itself, its partial fragments, shadows, reflections, labels, outlines and visual traces. Fill the removed area with physically plausible wall, floor, rug, furniture surface or background that matches the original scene.
-- MUST ADD these user-requested objects as real physical objects only if they fit the close-up crop: ${(addedElements || []).join(", ") || "none"}. Add each item with correct scale, perspective, lighting direction, contact shadows, material response and natural placement.
-- Do not expand the camera outward just to satisfy the keep list. The close-up crop is more important than showing many room elements.`
-        : viewMode === "mid"
-          ? `
-Strict element editing instructions for mid view:
-- In mid view, selected scene elements are context and scale references from the same room, not a reason to choose a different sofa placement.
-- Keep useful selected elements visible when they fit the closer camera framing: ${(selectedElements || []).join(", ") || "none"}.
-- Prioritize indoor elements that prove same-room placement and lighting, such as rug, floor seams, couch edge, lamp, plant, table edge, cabinet, wall art, wall material, soft decor, and curtain/window light spill only if useful. Do not prioritize visible window/balcony/exterior scenery in mid view.
-- MUST DELETE these recognized scene elements completely from the generated crop if they would appear: ${(removedElements || []).join(", ") || "none"}. Remove the object itself, its partial fragments, shadows, reflections, labels, outlines and visual traces. Fill the removed area with plausible matching material.
-- MUST ADD these user-requested objects as real physical objects only if they fit the partial-scene composition: ${(addedElements || []).join(", ") || "none"}. Add each item with correct scale, perspective, lighting direction, contact shadows, material response and natural placement.
-- The mid-view crop and natural sofa placement are higher priority than preserving a full list of room objects.`
-          : `
-Strict element editing instructions:
-- For wide view, selected recognized scene elements are same-room preservation requirements.
-- Keep these recognized scene elements visible and identifiable in the final room view: ${(selectedElements || []).join(", ") || "none"}.
-- Preserve their relationship to the original room as much as the wider camera composition allows.
-- MUST DELETE these recognized scene elements completely from the final image: ${(removedElements || []).join(", ") || "none"}. Remove the object itself, its partial fragments, shadows, reflections, labels, outlines and visual traces. Fill the removed area with physically plausible wall, floor, rug, furniture surface or background that matches the original scene.
-- MUST ADD these user-requested objects as real physical objects in the final image: ${(addedElements || []).join(", ") || "none"}. Add each item clearly enough to be recognizable, with correct scale, perspective, lighting direction, contact shadows, material response and natural placement in the room.
-- The keep/delete/add lists are hard constraints for element presence and must respect the original room's spatial logic.`;
-
-    const placementLightingRules =
-      viewMode === "mid"
-        ? `
-Placement and lighting rules for mid view:
-Use a local crop of the reference room. The generated frame may show only part of the original room, but it should still feel like the same room and same sofa placement logic as the wide view.
-Choose the sofa placement once from the room logic: default near the window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface when present and reasonable, but keep it in the adjacent indoor seating zone rather than centered in front of the glass. If that placement blocks passage, door swing, cabinet opening, TV viewing, couch use, or circulation, choose the second priority: beside the existing main sofa / couch side within the conversation area.
-Shoot from the indoor side toward the room interior. The mid-shot camera should capture the sofa plus indoor objects, not the outdoor window. Keep the window/balcony/light surface out of frame whenever possible; if unavoidable, show only a very narrow edge or soft light spill.
-The sofa orientation should face inward into the room, toward the conversation area, couch, or TV wall. The camera angle may be side-front, but the sofa should not look like it is facing the window or posed only toward the camera.
-Rotate the product naturally for that position. Do not preserve the product upload's original left-facing/right-facing angle if the seating zone needs another yaw direction. Reconstruct the same chair from the new view as a real 3D object.
-Do not place the chair in the exact center of a wide empty room, directly centered against the window, or so close to camera that it becomes a giant foreground recliner. Leave enough walkway/floor around the chair to feel placed by an interior designer.
-Match the reference lighting: in this room, daylight comes mainly from the large rear/side windows with warm ceiling strip/practical light. The chair should have soft cool daylight highlights from the window side, warmer fill from ceiling/ambient light, and contact shadows falling consistently on the rug/floor.
-The chair's shadow should be soft, attached under the base/legs, and consistent with the rug texture. Avoid pasted-on edges, different color temperature, or studio lighting that ignores the room.`
-        : viewMode === "close"
-          ? `
-Placement and lighting rules for close view:
-Use the exact same sofa placement and orientation logic as mid view, but push the camera closer.
-When placed near the window/balcony/light area, the close camera should be positioned on the indoor side of the sofa and shoot inward toward the room interior. Do not aim the camera outward through the window or make the exterior view the background.
-The sofa should be angled toward the camera in a front three-quarter or side-front close view, so the viewer can see product material details plus one side/armrest volume. Avoid back-facing, rear three-quarter, or flat straight-on views.
-The close shot is photographing the interior, not the outdoor window. Prefer indoor room objects as softly blurred context behind or beside the sofa: side table, lamp, plant, couch edge, wall art, cabinet, wall material, rug or floor seams. Keep the window/balcony/light surface out of frame whenever possible; if unavoidable, show only a very narrow edge or light spill, never a large window view.
-Match the reference lighting from the window side and indoor ambient fill, with soft contact shadows attached to the sofa base and consistent highlights on the material.`
-        : viewMode === "wide"
-          ? `
-Placement and lighting rules for wide view:
-Preserve the uploaded room's spatial logic and compose a wider interior camera view. Show the room, main furniture and the sofa placement relationship clearly.
-Default placement rule: if the room has an obvious window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface, place the single sofa near that window/balcony/light area.
-Exception rule: do not place it there if it blocks a passage, door swing, cabinet opening, TV viewing line, traffic flow, or creates an obviously unreasonable furniture layout; then use the second priority: place it beside the existing main sofa / couch side within the conversation area.
-The chair orientation should follow the room's floor perspective and seating logic, usually angled 15-35 degrees toward the conversation/TV/seating area or toward the window/view as appropriate. The chair may face left, right, away from camera, or three-quarter to camera as needed; do not lock it to the uploaded product photo's angle.
-Match the reference room lighting exactly enough to feel photographed in that room: daylight softness, color temperature, warm/cool balance, shadow direction, contact shadow and material response.
-Avoid studio-lit or pasted-on product lighting.`
-          : "";
-
-    const viewQualityRules =
-      viewMode === "mid"
-        ? `
-Mid-view final self-check before generating:
-- The image must read as a cropped partial-scene product shot, not as the original full room with a chair inserted.
-- Only part of the surrounding room should be visible; most ceiling and far-room context should be cropped away.
-- The chair must sit in a plausible adjacent indoor seating position near the natural-light area when reasonable, with natural clearance, angle and floor contact.
-- The sofa must not be centered directly in front of the window/glass wall and must not block the couch, walkway, cabinet, TV line, or main view.
-- The camera must feel on the indoor side of the sofa, shooting toward the room interior rather than outward toward the window.
-- The background must be indoor room objects such as rug/floor, side table, lamp, plant, couch edge, cabinet, wall art, wall material or soft decor. The window/balcony/exterior view should not be the background; if any window/light surface appears, it must be only a very narrow edge or light spill.
-- Prefer a side-front camera view of a sofa that is diagonally facing inward into the room. The camera can see the front and one side, but the sofa should not face the window/exterior or look turned only toward the camera. Avoid back-facing or rear three-quarter views.
-- The chair must pass a physical scale check: one adult seat, narrower than a couch module group, backrest around couch-back height or slightly higher, seat height near normal knee height, and not more than about 42% of image height.
-- The product identity must pass a 3D orientation check: same sofa model, but rotated naturally for the room, not copied from the upload angle.
-- The chair's highlight side, shadow side, contact shadow softness and color temperature must match the reference room lighting.`
-        : viewMode === "close"
-          ? `
-Close-view final self-check before generating:
-- The image must read as a close product-in-room shot from the same placement as mid view, not a full-room view and not a pure macro.
-- The camera must feel on the indoor side of the sofa, shooting toward the room interior rather than outward toward the window.
-- The sofa should diagonally face the camera in a front three-quarter or side-front close view. Avoid back-facing, rear three-quarter or flat straight-on views.
-- The sofa subject should occupy about 65-75% of the image, with 25-35% indoor environment context.
-- Indoor objects should appear as cropped or softly blurred context cues. The window/balcony/exterior view should not be the background; if any window/light surface appears, it must be only a very narrow edge or light spill.
-- The chair's material highlights, shadow side, contact shadow softness and color temperature must match the reference room lighting.`
-        : viewMode === "wide"
-          ? `
-Wide-view final self-check before generating:
-- The image must read as a wide-angle full-room catalog shot of the same room, with a naturally placed single lounge chair.
-- The camera should feel moved back and wider, not like a mid shot.
-- If a window, floor-to-ceiling window, balcony door, balcony area, or main natural-light surface exists, verify the sofa is near that area unless it would block circulation, doors, cabinets, TV viewing or a sensible furniture layout.
-- The chair must be clear but not oversized, in a real seating zone and not a foreground close-up.
-- The chair orientation must make sense relative to the room's couch/seating group, window/balcony/light area, rug and room perspective.
-- The chair must pass a physical scale check: one-person recliner/armchair, smaller than the multi-seat couch, not taller than room elements, and not scaled from the uploaded product photo's frame size.
-- The product identity must pass a 3D orientation check: same sofa model, but rotated naturally for the room, not copied from the upload angle.
-- The chair's light, reflections and shadows must match the reference room's daylight plus warm interior ambient lighting.`
-          : "";
-
-    const physicalScaleRules =
-      viewMode === "wide" || viewMode === "mid"
-        ? `
-Physical scale procedure:
-1. First estimate real scale from the reference room anchors: couch seat modules, rug width, floor tile seams, wall art, plant pot, lamp, window height, balcony door height, cabinet height and walkway width.
-2. Then place the sofa as a real single-person recliner on that room's floor plane. Treat it as about 0.8-1.0m wide, 0.85-1.05m deep and 0.85-1.1m tall.
-3. Only after the real-world size is fixed, choose camera crop and image framing. Never enlarge the sofa just because the uploaded product photo fills its frame.
-4. If the product appears too large for the rug, couch, lamp or wall art, reduce it or move/crop the camera; do not make the room scale bend around the product.`
-        : "";
-
-    const roomScaleRules =
-      viewMode === "close"
-        ? `
-Close-up scale and crop rules:
-This is a close product-in-room shot, not a complete-room view and not an isolated macro.
-Show a cropped but recognizable sofa region, such as armrest plus seat cushion, cushion texture and silhouette, back cushion stitching, seat-front panel, side lever plus cushion seam, or recliner padding transition.
-The crop should highlight material, contour, cushion shape and local soft furnishing details while preserving enough room context at the edges/background.
-The visible sofa subject should occupy about 65-75% of the image area. This is closer than mid view, but not an environment-free macro. The implied object scale must remain realistic: normal cushion thickness, normal arm width, normal leg size, normal stitch spacing, and normal relation to rug weave or floor seams.
-If near a window/balcony/light area, do not photograph the exterior/window as the background. The camera must be on the indoor side and shoot inward toward the room, with the sofa diagonally facing the camera in a front three-quarter or side-front close angle. Use indoor objects for background context; windows/balcony/light surfaces should stay out of frame unless only a very narrow edge or soft light spill is unavoidable.
-If a selected scene element is large, such as a window, sofa, wall art, or coffee table, it may appear as a cropped edge, reflection, texture, partial background cue, or softly blurred local context.
-Negative constraints for close view: isolated studio cutout, pure macro texture with no environment, full living-room reconstruction, giant chair, tiny room, mismatched floor contact, excessive visible rug around every side, distant wide-angle perspective, product pasted onto a complete scene.`
-        : viewMode === "wide"
-          ? `
-Wide-view scale rules:
-The sofa must be a normal single-person armchair, approximately 80-100cm wide, 85-105cm deep, and 85-110cm high relative to nearby furniture, wall art, floor tiles, rug, lamp and room height.
-Show the complete armchair with all main product structure visible. It should occupy about 16-24% of the image height and 12-20% of the image width in a full-room composition. Use these numbers only after checking real scale anchors.
-The chair must be clearly readable and not miniature. Cushion divisions, armrests and back height should remain visible, but it must not become the dominant foreground object.
-The chair must be smaller than a three-seat sofa and should be roughly one lounge-chair seating module: about one couch seat plus armrest in width, not two couch seats. Its back height should align with a normal lounge chair: around couch-back height or modestly higher, not near window, wall-art, cabinet or lamp height.
-Use the rug, couch seat modules, floor tile seams, plant pot, lamp height and wall art as physical measuring references before choosing image size. Do not decide size from the product photo alone.
-Place it near the window/balcony/main natural-light area when present and reasonable, scaled as a normal single chair. Do not push it so far into the background that it becomes a toy, and do not pull it into the foreground like a giant object.
-Preserve full-room context, but keep the ceiling, floor and negative space balanced so the product does not disappear.
-Negative constraints for wide view: tiny distant chair, dollhouse scale, chair lost in empty room, oversized chair blocking the seating area, extreme fisheye room, ceiling-dominant composition, pasted-on product.`
-        : viewMode === "mid"
-          ? `
-Mid-view scale rules:
-The sofa must be a normal single-person armchair, approximately 80-100cm wide, 85-105cm deep, and 85-110cm high relative to nearby furniture, rug, lamp, floor seams, couch and wall height.
-Show the entire chair or most of the chair. Cropping one side, the footrest edge, or the top edge slightly is acceptable when it improves product-medium-shot composition, but keep the main product identity readable.
-The chair should occupy about 32-42% of image height and 24-34% of image width. It should look like a medium product shot in a cropped room area, not a close-up giant chair and not a full-room distant chair.
-The chair width should be about one single lounge chair, clearly narrower than the multi-seat couch and no wider than one couch seat plus armrest. It should not span most of the rug width or block the room walkway.
-Use nearby partial furniture as scale anchors before sizing: couch seat width, rug weave and border, floor tile seams, table/lamp/plant size, wall art height. Keep visible rug/floor contact around the chair base, especially in front and one side, so the viewer can judge its footprint.
-Prefer a cropped local seating-zone composition with very limited ceiling. If the reference room has a large ceiling, crop lower and closer rather than enlarging the chair inside a full-room wide view.
-Negative constraints for mid view: full-room wide-angle view, giant chair dominating the room, chair centered directly in front of a window/glass wall, exterior-window background, chair wider than the couch seat group, huge recliner blocking the sofa, extreme wide-angle distortion, complete room shown with product too small, floating base, mismatched shadow, wrong lighting direction.`
-        : `
-Scale the sofa as a real single-person armchair in the room.
-The sofa should be approximately 80-100cm wide, 85-105cm deep, and 85-110cm high relative to nearby furniture, wall art, floor tiles, rug, lamp and room height.
-For scene integration, the sofa should occupy only 28%-40% of the image height.
-For model view, the sofa and model together should look like a realistic single-person seating setup. The sofa should not exceed about 40%-48% of the image height in a normal lifestyle composition, and the model should not appear miniature relative to the chair.
-The sofa width should not exceed 45%-55% of the visible rug width, and should be clearly smaller than the main wall art or background wall area.
-Keep visible floor and rug space around the sofa on all sides.
-Do not make the sofa oversized, giant, floating, pasted-on, or closer to camera than the room perspective allows.`;
+    const elementEditingRules = `
+元素保留与增删：
+保留用户选择的元素：${(selectedElements || []).join(", ") || "无"}。按当前视角自然保留，可完整、局部、裁切或虚化出现，但不要喧宾夺主。
+删除元素：${(removedElements || []).join(", ") || "无"}。不要再出现在画面中。
+新增元素：${(addedElements || []).join(", ") || "无"}。保持真实比例和原房间风格，不破坏主要空间关系，不遮挡沙发主体。`;
 
     return `${shared}
-Use the uploaded room scene as the reference environment. Preserve its room identity, lighting direction, color temperature, wall/floor materials, decor language and spatial logic. Wide, mid and close views are the same room and same sofa placement decision; only the camera position changes.
-${roomFramingStrategy}
-Scene analysis to preserve and use for placement/camera decisions: ${JSON.stringify(sceneAnalysis || {})}
+房间融入专用规则：${WINDOW_FRONT_PRIORITY} 不再要求贴着已有长沙发扶手外侧。${SOFA_ORIENTATION_MATCH} ${WINDOW_SIDE_CAMERA} 如果参考图原本不是这个机位，也必须优先满足“沙发在窗户前面、沙发与现有沙发同向、相机可以移动到同向沙发的正前方或侧前方、相机水平旋转约 40 度、画面尽头不是窗户”的关系。
+房间融合规则：参考图只用于提取房间类型、主要元素、装修风格、材质、采光和空间气质；最终应在不违反房间融入专用规则的前提下重新生成一张风格类似的完整室内场景，不需要和原图布局、机位、角度或物品位置完全一样。但不得重组“窗户/窗帘/采光区、上传沙发固定落点”之间的相对关系。
+根据房间图识别出的元素生成风格类似的新室内场景：保留同类门窗、墙地面材质、采光方式、装修风格和主要家具关系即可，不要逐像素复刻原房间。
+用于风格、元素和光线参考的场景分析：${JSON.stringify(safeSceneAnalysis)}
+${scenePlacementContext}
 ${elementEditingRules}
-Image 1 is the exact sofa product reference. Image 2 is the room scene reference and spatial reference.
-For wide, mid and close views, treat Image 2 as the same room being photographed from different camera positions. Preserve the room's architecture, windows/balcony/light surfaces, main furniture relationships, material palette and lighting direction while integrating the sofa.
-Do not redesign, reshape, inflate, simplify, merge, or invent any part of the sofa. Preserve the product identity, not the original 2D product-photo pose.
-The generated sofa must preserve the same cushion layout, armrest shape, backrest height, seams, stitching, legs, fabric/leather texture, color and physical proportions from Image 1, but it may be rendered from a different camera angle or facing direction to match the room.
-If the uploaded product image is front-facing, side-facing, left-facing, right-facing, upright, or photographed from a product studio angle, infer the same real chair rotated into the scene's natural orientation. Do not paste the uploaded product image as a flat cutout.
-Do not add extra cushions, extra panels, oversized footrests, recliner mechanisms, or change the sofa into a bulky massage chair.
-
-${roomScaleRules}
-
-${placementLightingRules}
-
-${viewQualityRules}
-
-${physicalScaleRules}
-
-Before placing the sofa, infer the floor plane, tile seams, rug size, vanishing point, camera height, wall scale, lamp height, window/balcony/light area and surrounding furniture size of the reference room.
-Place the sofa on the floor plane with correct contact shadows.
-Rotate the sofa to match the reference room layout and floor perspective lines.
-The sofa front direction should align naturally with the seating area, not randomly face the camera.
-
-Integrate the exact uploaded single sofa into the reference room as a real physical object, not as a redesigned generated chair.
-Use the reference room's floor grid, rug size, wall art, lamp, window/balcony/light area and furniture as scale references.
-Choose the same sofa placement for wide, mid and close views. For wide view, move the camera back and use a wider lens to show the whole room. For mid view, move the camera closer to the same placed sofa while preserving its orientation and surrounding room logic. For close view, push the camera closer from the indoor side and shoot inward toward the room, preserving the same placement and side-front orientation.
-The sofa must remain a single-person armchair size and must not dominate the room.
-Preserve enough negative space, visible rug, visible floor and surrounding decor.
-Match the reference room's lighting direction, shadow softness, color temperature and perspective.
-If the window/balcony/main natural-light area is a reasonable placement zone, place the sofa there by default. If not, use the second priority: place it beside the existing main sofa / couch side within the conversation area.
-Before generating, infer the reference room's light source, camera height, vanishing point, floor plane, available placement zone and furniture orientation. Use those cues to choose the sofa position, size, rotation and facing direction.
-The sofa must sit on the floor with correct contact shadows and occlusion. Its front/back/side orientation should feel intentional within the reference room layout, not randomly facing the camera.
-For model view specifically: the model's thighs should rest on the seat, back should contact the back cushion naturally, feet should meet the floor or footrest believably, and shadows should show real contact between body, sofa and floor. Do not scale the sofa larger to make the model fit.
-Negative constraints: oversized sofa, giant chair, two-seat sofa, bulky massage chair, model looks tiny, model swallowed by chair, distorted human anatomy, distorted cushions, changed armrest shape, changed backrest shape, extra seams, extra pillows, floating object, wrong perspective, pasted-on product, incorrect scale.`;
+图 1 是准确的沙发产品参考，图 2 是房间和空间参考。
+摆放逻辑：必须像真实室内设计师在现场布置。第一步先判断房间窗户、阳台、电视墙、通道、已有沙发/茶几/柜体的位置，并确定唯一固定沙发落点；第二步判断已有沙发的大体朝向，用靠背线、座面开口、扶手方向、抱枕方向和茶几/电视墙关系推断现有沙发正面向量；第三步把上传单人沙发的正面向量锁定为同一方向，只允许约 5-15 度自然偏角，不能转成相反方向、垂直方向、面对现有沙发或为了镜头改变朝向；第四步保持沙发位置和朝向不动；第五步只移动相机位置、焦段和裁切来满足当前视角。上传单人沙发应落在窗户、落地窗或窗帘正前方的室内采光区，靠近窗墙、窗帘线、窗台或落地窗内侧；如果有现有沙发，上传单人沙发必须与现有沙发同向，不再强行改成面向电视墙、面向镜头或面向室内的另一个方向；如果没有现有沙发，则保持沙发斜向屋内、方便使用。对于有大窗/窗帘的客厅，远景、中近景和近景都必须把沙发固定在窗帘线/窗墙/窗台前方附近，再通过相机远近和局部裁切形成对应视角；不要为了构图把沙发移到画面中央、茶几旁、电视前方或通道中央，也不要为了让产品正对镜头而旋转沙发本体。中近景机位可移动到室内靠窗侧边、窗户内侧边缘、同向沙发的正前方或侧前方；“正前方/侧前方”只描述相机相对已经锁定朝向的沙发在哪里，不表示重新给沙发定向。镜头像从窗前采光区边缘水平旋转约 35-45 度向室内拍摄，视线经过沙发后落到会客区、电视墙、柜体、内墙和屋内家具。不要沿房间长轴直拍到另一面窗户，不要让画面尽头是窗户/落地窗/窗帘墙，不要从客厅深处朝窗户方向拍，也不要对着窗帘墙拍产品。中近景画面必须保留至少一个位置锚点，例如窗帘线、窗墙、窗框边缘、窗台、柔和窗光或落地窗内侧，用来证明沙发在窗户前面；但这些窗户线索只能作为边缘或窄条，主背景必须是室内空间和屋内物品。不要把沙发放在房间中央、地毯中央、通道中央、茶几旁中心、电视前方、柜门前方或任何会阻挡动线的位置。
+光线匹配：生成沙发前先判断窗光、灯光、墙面反光和地面反射。沙发不能比同区域家具更亮、更冷或更硬；如果旁边家具受暖色灯和柔和窗光影响，沙发也必须呈现相同色温、曝光、高光强度和接触阴影。
+可生成参考图中识别出的同类环境元素，如茶几、地毯、灯具、绿植、画作、柜体和软装；不要添加与参考风格无关的新物体。只有用户选择需要模特时才允许添加一位人物。
+严格按“视角要求”执行机位、比例、画面占比和背景选择；但沙发摆放位置只能由最高优先级落位硬规则决定，不能由视角要求重新决定。`;
   }
 
-  const styleModeFramingRules =
-    viewMode === "wide"
-      ? `
-Style-mode wide-view rules:
-This must be a true wide environmental room image, not a medium close-up product image.
-Build the scene first as a full living room, villa lounge, boutique hotel lounge, or refined resort terrace. Then place the recliner naturally into that space.
-The camera should be far enough away to show the seating zone, floor/rug footprint, wall/window/decor context, and open negative space around the chair.
-The recliner should sit in the middle ground and remain fully visible, but it must not dominate the frame. Its height should be about 12-18% of the image height, with generous room context above, below, and to both sides.
-Show multiple scale anchors around it: rug boundary, side table or coffee table edge, lamp, wall art, curtain/window, plant, floor seams, sofa/cabinet or architectural line.
-If the image starts to look like a product portrait, pull the virtual camera back, widen the field of view, and reduce the chair size rather than cropping tighter.
-Negative constraints for style wide: medium shot, close-up, recliner fills the frame, cropped recliner, footrest foreground dominating the image, shallow product portrait, empty studio set, isolated product render, room context missing.`
-      : "";
-
   return `${shared}
-Create a brand-new scene using this chosen style: ${stylePrompts[styleId]}.
-${styleModeFramingRules}
-The uploaded product image is the exact reference for a La-Z-Boy Indian single recliner. The final generated product must be shown in the extended reclining state, similar to a premium ecommerce hero image: backrest slightly reclined, footrest fully extended forward, continuous padded cushion structure visible, plush segmented leather panels, side lever if visible, and the relaxed lounge posture clearly communicated.
-If the uploaded reference is upright, closed, or photographed from a different angle, infer the same chair unfolded into its correct extended recliner state while preserving the product identity, brown leather color, cushion layout, armrest shape, stitching, seams, material texture and proportions.
-Do not generate a generic armchair, ordinary sofa, two-seat couch, massage chair, or redesigned recliner. Do not add text, barcode, labels, poster typography, logos, watermarks or graphic overlays.
-The extended footrest must look mechanically plausible and connected to the chair body, not floating or detached. Keep the chair realistically scaled as a single-person recliner in the scene.
-Build the scene around the extended recliner with coherent interior styling, uncluttered composition, high-end ecommerce product clarity and beautiful lighting.
-Choose a natural recliner orientation for the room layout, then make lighting, scale, camera angle and shadows coherent. For wide view, prioritize full-room readability and realistic environmental scale over product close-up impact. If the selected view includes a model, the model must look candid, balanced and naturally supported by the extended recliner.`;
+风格直接生成模式：没有房间参考图，不执行靠窗、已有沙发扶手外侧、窗帘线固定落点等房间融入规则；请按所选风格创建全新的室内/生活方式场景，并为产品选择自然、可信、适合电商展示的落地位置。
+按所选风格生成全新的室内/生活方式场景：${stylePrompts[styleId]}。
+上传产品图是 La-Z-Boy Indian 单人躺椅的准确参考。最终产品应为展开休闲状态：靠背微微后仰，脚踏向前展开，连续厚实坐垫、分段皮革、扶手、缝线和材质纹理清晰。
+如果参考图是直立、收起或其他角度，请推断同一把椅子的展开状态，并保持上传产品的实际颜色、实际材质、坐垫布局、扶手形状、缝线、纹理和比例一致；例如上传产品是蓝色布艺，就必须保持蓝色布艺，不要改成棕色皮革。
+不要生成普通扶手椅、普通沙发、双人沙发、按摩椅或改款躺椅；不要文字、条码、标签、logo、水印或海报元素。
+脚踏必须与椅身机械连接合理，不能漂浮或断开；整体保持真实单人躺椅比例。
+围绕展开躺椅构建干净、高端、光线漂亮的电商场景。根据“视角要求”和“模特要求”统一机位、比例、画面占比和背景选择。`;
 }
 
 async function startServer() {
@@ -624,14 +400,7 @@ async function startServer() {
         return res.status(400).json({ error: "sceneImage is required" });
       }
 
-      const analysisViewInstruction =
-        viewMode === "close"
-          ? "用户选择了近景。近景和中近景应理解为同一个房间、同一个沙发摆放位置下移动机位拍摄：中近景是靠近同一摆放点，近景是在同一摆放点继续推进机位。沙发摆放优先级必须明确：第一优先放在窗边、阳台边或靠近主要自然采光区的位置；只有当该位置会挡通道、门、柜体开启、电视观看动线、长沙发使用或造成明显不合理摆放时，第二优先放在现有长沙发/主沙发侧边的会客位置。近景机位必须和中近景一样在室内侧边，镜头朝室内方向拍摄，而不是朝窗外方向拍摄。近景拍摄的是室内和沙发细节，不是拍摄室外窗户；如果沙发摆在窗边/阳台边/采光区，画面应拍到沙发和部分室内物品虚像，窗户/阳台/采光面默认不入镜，只作为光源判断；如果不可避免，只能保留极窄边缘或柔和光线，不能让窗户、阳台或窗外景观成为背景主体。沙发应斜朝向镜头，使用前侧三分之四或侧前近景角度，突出沙发材质、轮廓、坐垫、扶手、缝线、皮革/布料纹理、靠背边缘和局部软装细节。沙发主体占画面约65%-75%，同时保留约25%-35%的室内环境信息，例如地毯/地板纹理、边几、灯具、绿植、长沙发边缘、柜体、墙面、装饰画或局部软装的虚化背景。placementSuggestion 应说明同一摆放点下的近景机位、室内侧边朝室内拍摄、沙发主体占比和保留的室内物品虚像，recommendedOrientation 应说明沙发斜朝向镜头和具体侧前角度。"
-          : viewMode === "mid"
-            ? "用户选择了中近景。中近景和远景应理解为同一个房间、同一个沙发摆放逻辑下移动机位拍摄。请先判断单人沙发在此房间最合理的固定摆放位置，摆放优先级必须明确：第一优先放在窗边、阳台边或靠近主要自然采光区的位置；只有当该位置会挡通道、门、柜体开启、电视观看动线、长沙发使用或造成明显不合理摆放时，第二优先放在现有长沙发/主沙发侧边的会客位置。窗边/阳台边/采光区是沙发摆放位置优先级，不是拍摄方向。沙发本身应斜着面朝屋内，朝向会客区、长沙发或电视墙，不要面朝窗户或窗外。中近景机位应在室内侧边，朝室内方向拍摄；相机距离约2.8-4米，使用约40-55mm中焦感，机位与沙发正面形成约30-45度夹角，因此画面能看到沙发正面和一侧，但沙发仍然是在朝屋内摆放，而不是为了镜头摆拍。画面应拍到沙发和室内物品，背景优先是地毯/地板、边几、灯具、绿植、长沙发边缘、柜体、墙面、装饰画或局部软装；窗户/阳台/采光面只作为光源和摆放锚点，尽量不入镜，如果不可避免只能保留窄边缘或柔和光线。沙发大小应是正常单人椅，占画面高度约32%-42%、宽度约24%-34%，明显小于长沙发，不要前景巨大、不要压住画面中心。placementSuggestion 应说明第一优先窗边/采光区，第二优先现有长沙发/主沙发侧边；recommendedScale 应说明32%-42%高度和24%-34%宽度；recommendedOrientation 应说明沙发斜着面朝屋内/会客区，室内侧边30-45度机位朝室内拍摄。"
-            : viewMode === "model"
-              ? "用户选择了模特视角。请重点分析人体与单人沙发的比例、坐姿接触、脚落地和阴影关系。"
-              : "用户选择了远景。远景应使用较广角的室内远景构图，完整呈现房间、主要家具和沙发摆放关系。请先判断单人沙发在此房间最合理的固定摆放位置，摆放优先级必须明确：第一优先放在窗边、阳台边或靠近主要自然采光区的位置；只有当该位置会挡通道、门、柜体开启、电视观看动线、长沙发使用或造成明显不合理摆放时，第二优先放在现有长沙发/主沙发侧边的会客位置。沙发需要在完整空间中清晰可辨但保持正常单人椅比例，不能前景巨大遮挡空间，也不能远到像玩具。上传产品图方向只作为款式参考，最终朝向可以改变，请在 recommendedOrientation 中明确建议旋转角度和朝向。recommendedScale 应参考三人沙发、地毯宽度、窗高、电视墙/书柜、阳台门和地砖缝，说明单人沙发在全屋图中应保持正常单椅比例且细节仍可辨认。请特别说明窗户/阳台自然光、室内暖光、阴影方向和接触阴影应该如何匹配。";
+      const analysisViewInstruction = `当前视角规则：${viewPrompts[viewMode]}。只按这份规则分析房间，不要扩展另一套机位、比例或构图规则。`;
 
       const scene = parseDataUrl(sceneImage);
       const response = await ai.models.generateContent({
@@ -640,7 +409,7 @@ async function startServer() {
           parts: [
             {
               text:
-                `请分析这张室内场景图，用于把单人沙发融入场景。${analysisViewInstruction}只返回 JSON，字段包括 roomType、style、lighting、lightingDirection、colorPalette、cameraAngle、perspectiveCues、placementSuggestion、recommendedScale、recommendedOrientation、modelInteractionSuggestion、elements。elements 是字符串数组，列出需要保留的画面元素，例如墙面、地板、窗户、茶几、地毯、灯具、绿植、装饰画等。重点判断光线方向、阴影软硬、相机高度、地面透视线、沙发应放在哪里、应多大、应该朝向哪里。`,
+                `请用中文分析这张室内场景图，用于生成单人沙发效果图。${analysisViewInstruction}聚焦于：1. 房间类型和装修风格；2. 门窗、阳台、墙地面、主要家具和动线；3. 光线方向、阴影软硬、色温和曝光；4. 相机高度、透视线、地面平面和尺度参照；5. 单人沙发最合理摆放位置、尺寸比例和自然朝向。placementSuggestion 必须建议：${WINDOW_FRONT_PRIORITY} ${SOFA_ORIENTATION_MATCH} ${WINDOW_SIDE_CAMERA} 不要建议房间中央、茶几旁中心、地毯中央、通道中央或电视前方。recommendedOrientation 必须先描述图中现有沙发/长沙发的朝向锚点，例如靠背线、座面开口、扶手方向、抱枕方向、茶几或电视墙关系；如果图中有现有沙发/长沙发，上传单人沙发必须与现有沙发同向，只允许约 5-15 度自然偏角；不要通过旋转沙发本体来让新沙发正对相机、面对现有沙发、转成垂直方向或转成相反方向。产品可见性通过移动机位解决；如果画面看见产品正面或侧面，原因必须是相机移动到同向沙发前侧，而不是沙发转向镜头。只返回 JSON，字段包括 roomType、style、lighting、lightingDirection、colorPalette、cameraAngle、perspectiveCues、placementSuggestion、recommendedScale、recommendedOrientation、modelInteractionSuggestion、elements。elements 是需要保留的画面元素数组。`,
             },
             { inlineData: { data: scene.data, mimeType: scene.mimeType } },
           ],
@@ -689,9 +458,9 @@ async function startServer() {
         colorPalette: "中性色",
         cameraAngle: "平视",
         perspectiveCues: "参考地面、墙角和家具边线判断透视",
-        placementSuggestion: "将单人沙发放在画面主要留白区域",
+        placementSuggestion: `${WINDOW_FRONT_PRIORITY} ${SOFA_ORIENTATION_MATCH} ${WINDOW_SIDE_CAMERA}`,
         recommendedScale: "与附近茶几、地毯、墙面高度保持合理比例",
-        recommendedOrientation: "朝向房间主要活动区或与现有家具形成自然夹角",
+        recommendedOrientation: `如果有现有沙发，先识别现有沙发的靠背线、座面开口、扶手方向和茶几/电视墙关系，再让上传单人沙发与现有沙发同向，只允许约 5-15 度自然偏角；禁止反向、垂直、面对现有沙发或为了镜头改变朝向，产品可见性通过移动机位解决。如果没有现有沙发，则朝向房间主要活动区或电视墙。${SOFA_ORIENTATION_MATCH}`,
         modelInteractionSuggestion: "模特自然坐靠，身体重量落在坐垫上，避免遮挡沙发轮廓",
         elements: ["墙面", "地板", "窗户", "软装", "装饰物"],
       };
@@ -717,6 +486,7 @@ async function startServer() {
         sceneImage,
         styleId = "minimal",
         viewMode = "wide",
+        withModel = false,
         ratio = "1:1",
         resolution = "1K",
         sceneAnalysis,
@@ -731,6 +501,7 @@ async function startServer() {
         sceneImage?: string;
         styleId?: StyleId;
         viewMode?: ViewMode;
+        withModel?: boolean;
         ratio?: AspectRatio;
         resolution?: ImageSize;
         sceneAnalysis?: any;
@@ -749,17 +520,38 @@ async function startServer() {
       await verifyBeforeGenerate(userId, toolId);
 
       const product = parseDataUrl(productImage);
-      const parts: any[] = [
-        {
-          text: buildGenerationPrompt({
+      const generationPrompt = buildGenerationPrompt({
+        mode,
+        styleId,
+        sceneAnalysis,
+        selectedElements,
+        removedElements,
+        addedElements,
+        viewMode,
+        withModel,
+      });
+
+      console.log("\n===== Final Gemini Image Prompt =====");
+      console.log(
+        JSON.stringify(
+          {
             mode,
             styleId,
-            sceneAnalysis,
-            selectedElements,
-            removedElements,
-            addedElements,
             viewMode,
-          }),
+            withModel,
+            ratio,
+            resolution,
+          },
+          null,
+          2,
+        ),
+      );
+      console.log(generationPrompt);
+      console.log("===== End Final Gemini Image Prompt =====\n");
+
+      const parts: any[] = [
+        {
+          text: generationPrompt,
         },
         { inlineData: { data: product.data, mimeType: product.mimeType } },
       ];
@@ -807,45 +599,21 @@ async function startServer() {
             imageUrl: saasImage.url,
             recordId: saasImage.recordId,
             saasInfo: saasImage,
-            prompt: buildGenerationPrompt({
-              mode,
-              styleId,
-              sceneAnalysis,
-              selectedElements,
-              removedElements,
-              addedElements,
-              viewMode,
-            }),
+            prompt: generationPrompt,
           });
         } catch (saasError: any) {
           console.error("SaaS Save Error:", saasError.message);
           return res.json({
             imageUrl: dataUrl,
             saasError: saasError.message,
-            prompt: buildGenerationPrompt({
-              mode,
-              styleId,
-              sceneAnalysis,
-              selectedElements,
-              removedElements,
-              addedElements,
-              viewMode,
-            }),
+            prompt: generationPrompt,
           });
         }
       }
 
       res.json({
         imageUrl: dataUrl,
-        prompt: buildGenerationPrompt({
-          mode,
-          styleId,
-          sceneAnalysis,
-          selectedElements,
-          removedElements,
-          addedElements,
-          viewMode,
-        }),
+        prompt: generationPrompt,
       });
     } catch (error: any) {
       console.error("Generation Error:", error);
