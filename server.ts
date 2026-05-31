@@ -10,6 +10,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 dotenv.config();
 
 const PORT = Number(process.env.PORT || 3000);
+const JSON_BODY_LIMIT = "20mb";
 const SAAS_ORIGIN = stripTrailingSlash(process.env.SAAS_ORIGIN || "https://aibigtree.com");
 const SAAS_ENDPOINTS = {
   launch: resolveSaasEndpoint("SAAS_LAUNCH_URL", "/api/tool/launch"),
@@ -382,7 +383,7 @@ ${elementEditingRules}
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: "50mb" }));
+  app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
   const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY || "",

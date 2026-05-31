@@ -69,6 +69,8 @@ interface UploadBoxProps {
 
 const RESOLUTIONS: Resolution[] = ["1K", "2K", "4K"];
 const RATIOS: AspectRatio[] = ["1:1", "3:4", "4:3", "16:9"];
+const MAX_UPLOAD_EDGE = 1600;
+const UPLOAD_HINT = "支持常见图片格式（如 JPG, PNG, WebP），最大支持 20MB（通过前端压缩上传）";
 
 const VIEW_OPTIONS: Array<{
   id: ViewMode;
@@ -130,6 +132,49 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
+function loadImageFromFile(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("图片加载失败"));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function compressImageFile(file: File) {
+  const image = await loadImageFromFile(file);
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  const scale = Math.min(1, MAX_UPLOAD_EDGE / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("无法创建图片压缩画布");
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, targetWidth, targetHeight);
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 async function readJsonResponse(res: Response) {
   const text = await res.text();
   let data: any = {};
@@ -147,10 +192,15 @@ async function readJsonResponse(res: Response) {
 function UploadBox({ title, hint, image, onUpload, tall = false }: UploadBoxProps) {
   const [dragging, setDragging] = useState(false);
 
-  const handleFiles = async (files?: FileList | null) => {
+  const handleImageUpload = async (files?: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
-    onUpload(await readFileAsDataUrl(file));
+    try {
+      onUpload(await compressImageFile(file));
+    } catch (error) {
+      console.warn("Image compression failed, falling back to original file:", error);
+      onUpload(await readFileAsDataUrl(file));
+    }
   };
 
   return (
@@ -164,7 +214,7 @@ function UploadBox({ title, hint, image, onUpload, tall = false }: UploadBoxProp
       onDrop={(event) => {
         event.preventDefault();
         setDragging(false);
-        handleFiles(event.dataTransfer.files);
+        handleImageUpload(event.dataTransfer.files);
       }}
       className={`group relative flex w-full cursor-pointer flex-col items-center justify-center overflow-hidden border-2 border-dashed bg-white transition-all ${
         tall ? "min-h-[280px]" : "min-h-[220px]"
@@ -197,9 +247,9 @@ function UploadBox({ title, hint, image, onUpload, tall = false }: UploadBoxProp
       )}
       <input
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept="image/jpeg,image/png,image/webp"
         className="hidden"
-        onChange={(event) => handleFiles(event.target.files)}
+        onChange={(event) => handleImageUpload(event.target.files)}
       />
     </label>
   );
@@ -520,7 +570,7 @@ export default function App() {
                         </div>
                         <UploadBox
                           title="点击或拖拽上传场景图"
-                          hint="客厅、卧室、休闲区等空间图"
+                          hint={UPLOAD_HINT}
                           image={sceneImage}
                           onUpload={(image) => {
                             setSceneImage(image);
@@ -543,7 +593,7 @@ export default function App() {
                         <p className="text-sm font-bold">步骤 2：上传单人沙发产品图</p>
                         <UploadBox
                           title="点击或拖拽上传沙发"
-                          hint="建议白底或干净背景，保留完整轮廓"
+                          hint={UPLOAD_HINT}
                           image={productImage}
                           onUpload={setProductImage}
                           tall
@@ -647,7 +697,7 @@ export default function App() {
                       <p className="text-sm font-bold">上传您的单人沙发产品图</p>
                       <UploadBox
                         title="点击或拖拽上传沙发"
-                        hint="AI 会保持沙发外观并生成新场景"
+                        hint={UPLOAD_HINT}
                         image={productImage}
                         onUpload={setProductImage}
                         tall
