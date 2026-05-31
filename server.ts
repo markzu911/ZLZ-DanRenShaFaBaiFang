@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import { pathToFileURL } from "url";
 
 dotenv.config();
 
@@ -385,7 +386,11 @@ ${elementEditingRules}
 围绕展开躺椅构建干净、高端、光线漂亮的电商场景。根据“视角要求”和“模特要求”统一机位、比例、画面占比和背景选择。`;
 }
 
-async function startServer() {
+type CreateAppOptions = {
+  mountFrontend?: boolean;
+};
+
+export async function createApp({ mountFrontend = true }: CreateAppOptions = {}) {
   const app = express();
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
@@ -663,6 +668,10 @@ async function startServer() {
     }
   });
 
+  if (!mountFrontend) {
+    return app;
+  }
+
   if (!SERVE_DIST) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -677,9 +686,17 @@ async function startServer() {
     });
   }
 
+  return app;
+}
+
+async function startServer() {
+  const app = await createApp();
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`SofaGen AI running on http://localhost:${PORT}`);
   });
 }
 
-startServer();
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  startServer();
+}
