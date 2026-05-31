@@ -15,7 +15,7 @@ const SERVE_DIST =
   process.env.NODE_ENV === "production" ||
   process.env.SERVE_DIST === "true" ||
   process.env.npm_lifecycle_event === "start";
-const SAAS_ORIGIN = stripTrailingSlash(process.env.SAAS_ORIGIN || "https://aibigtree.com");
+const SAAS_ORIGIN = stripTrailingSlash(process.env.SAAS_ORIGIN || "http://aibigtree.com");
 const SAAS_ENDPOINTS = {
   launch: resolveSaasEndpoint("SAAS_LAUNCH_URL", "/api/tool/launch"),
   verify: resolveSaasEndpoint("SAAS_VERIFY_URL", "/api/tool/verify"),
