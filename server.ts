@@ -11,6 +11,10 @@ dotenv.config();
 
 const PORT = Number(process.env.PORT || 3000);
 const JSON_BODY_LIMIT = "20mb";
+const SERVE_DIST =
+  process.env.NODE_ENV === "production" ||
+  process.env.SERVE_DIST === "true" ||
+  process.env.npm_lifecycle_event === "start";
 const SAAS_ORIGIN = stripTrailingSlash(process.env.SAAS_ORIGIN || "https://aibigtree.com");
 const SAAS_ENDPOINTS = {
   launch: resolveSaasEndpoint("SAAS_LAUNCH_URL", "/api/tool/launch"),
@@ -399,6 +403,7 @@ async function startServer() {
       textModel: TEXT_MODEL,
       hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
       saasOrigin: SAAS_ORIGIN,
+      serveDist: SERVE_DIST,
     });
   });
 
@@ -658,7 +663,7 @@ async function startServer() {
     }
   });
 
-  if (process.env.NODE_ENV !== "production") {
+  if (!SERVE_DIST) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

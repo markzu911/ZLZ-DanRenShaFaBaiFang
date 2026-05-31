@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file=.env --use-env-proxy ./node_modules/tsx/dist/cli.mjs server.ts",
+    "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
@@ -19,6 +20,7 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "tsx": "^4.21.0",
     "vite": "^6.2.3"
   },
   "devDependencies": {
@@ -26,7 +28,6 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
     "typescript": "~5.8.2"
   }
 }
