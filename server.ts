@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import http from "http";
 import https from "https";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { HttpsProxyAgent } from "https-proxy-agent";
@@ -673,6 +672,7 @@ export async function createApp({ mountFrontend = true }: CreateAppOptions = {})
   }
 
   if (!SERVE_DIST) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
