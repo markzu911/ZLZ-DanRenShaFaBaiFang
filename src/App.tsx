@@ -298,9 +298,9 @@ export default function App() {
   const [saasConfig, setSaasConfig] = useState<{ userId?: string; toolId?: string }>({});
   const [userData, setUserData] = useState<{ name?: string; integral?: number } | null>(null);
   const [toolData, setToolData] = useState<{ integral?: number } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const currentResult = history[0];
-  const activeStyle = STYLE_OPTIONS.find((style) => style.id === styleId) || STYLE_OPTIONS[0];
 
   const canGenerate = useMemo(() => {
     if (!productImage || isGenerating) return false;
@@ -470,60 +470,93 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-[#f7f5ef] text-[#1e2428]">
-      <aside className="hidden w-[320px] shrink-0 flex-col border-r border-[#e6e1d8] bg-[#fbfaf7] px-6 py-7 lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-[8px] bg-[#171819] text-white">
+      <aside
+        className={`hidden shrink-0 flex-col border-r border-[#e6e1d8] bg-[#fbfaf7] py-7 transition-all duration-300 lg:flex ${
+          sidebarCollapsed ? "w-[88px] px-4" : "w-[320px] px-6"
+        }`}
+      >
+        <div className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] bg-[#171819] text-white">
             <Armchair className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight">SofaGen AI</h1>
-            <p className="text-xs font-medium text-[#8b8780]">单人沙发电商图</p>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold tracking-tight">SofaGen AI</h1>
+              <p className="text-xs font-medium text-[#8b8780]">单人沙发电商图</p>
+            </div>
+          )}
         </div>
 
-        <nav className="mt-10 space-y-2">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#9c968c]">导航菜单</p>
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          className={`mt-5 flex h-9 items-center justify-center rounded-[8px] border border-[#e2ddd4] bg-white text-[#4a4f52] shadow-sm transition-all hover:bg-[#f2f0ea] ${
+            sidebarCollapsed ? "w-full" : "ml-auto w-9"
+          }`}
+          aria-label={sidebarCollapsed ? "展开左侧导航栏" : "缩进左侧导航栏"}
+          title={sidebarCollapsed ? "展开左侧导航栏" : "缩进左侧导航栏"}
+        >
+          <ChevronRight className={`h-4 w-4 transition-transform ${sidebarCollapsed ? "" : "rotate-180"}`} />
+        </button>
+
+        <nav className={`${sidebarCollapsed ? "mt-8" : "mt-10"} space-y-2`}>
+          {!sidebarCollapsed && (
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#9c968c]">导航菜单</p>
+          )}
           <button
             type="button"
             onClick={() => setMode("room")}
-            className={`flex w-full items-center gap-3 rounded-[8px] px-4 py-3 text-left text-sm font-semibold transition-all ${
+            className={`flex w-full items-center rounded-[8px] text-sm font-semibold transition-all ${
               mode === "room"
                 ? "bg-white text-[#171819] shadow-sm ring-1 ring-[#e2ddd4]"
                 : "text-[#77736b] hover:bg-white"
-            }`}
+            } ${sidebarCollapsed ? "h-12 justify-center px-0" : "gap-3 px-4 py-3 text-left"}`}
+            aria-label="构图分析与沙发替换"
+            title={sidebarCollapsed ? "构图分析与沙发替换" : undefined}
           >
-            <Camera className="h-5 w-5" />
-            构图分析与沙发替换
+            <Camera className="h-5 w-5 shrink-0" />
+            {!sidebarCollapsed && <span>构图分析与沙发替换</span>}
           </button>
           <button
             type="button"
             onClick={() => setMode("style")}
-            className={`flex w-full items-center gap-3 rounded-[8px] px-4 py-3 text-left text-sm font-semibold transition-all ${
+            className={`flex w-full items-center rounded-[8px] text-sm font-semibold transition-all ${
               mode === "style"
                 ? "bg-white text-[#171819] shadow-sm ring-1 ring-[#e2ddd4]"
                 : "text-[#77736b] hover:bg-white"
-            }`}
+            } ${sidebarCollapsed ? "h-12 justify-center px-0" : "gap-3 px-4 py-3 text-left"}`}
+            aria-label="风格直接融合生成"
+            title={sidebarCollapsed ? "风格直接融合生成" : undefined}
           >
-            <LayoutGrid className="h-5 w-5" />
-            风格直接融合生成
+            <LayoutGrid className="h-5 w-5 shrink-0" />
+            {!sidebarCollapsed && <span>风格直接融合生成</span>}
           </button>
         </nav>
 
-        <div className="mt-auto border-t border-[#e6e1d8] pt-6">
-          <div className="flex items-center gap-3 rounded-[8px] bg-[#efede7] p-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-white font-bold text-[#77736b]">
+        <div className={`mt-auto border-t border-[#e6e1d8] pt-6 ${sidebarCollapsed ? "flex flex-col items-center" : ""}`}>
+          <div
+            className={`flex items-center rounded-[8px] bg-[#efede7] ${
+              sidebarCollapsed ? "h-11 w-11 justify-center p-0" : "gap-3 p-3"
+            }`}
+            title={sidebarCollapsed ? userData?.name || "本地调试" : undefined}
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-white font-bold text-[#77736b]">
               {userData?.name?.[0] || "本"}
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold">{userData?.name || "本地调试"}</p>
-              <p className="text-xs text-[#8b8780]">
-                {userData ? `${userData.integral ?? 0} 积分可用` : "仅本机调用 Gemini"}
-              </p>
-            </div>
+            {!sidebarCollapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold">{userData?.name || "本地调试"}</p>
+                <p className="text-xs text-[#8b8780]">
+                  {userData ? `${userData.integral ?? 0} 积分可用` : "仅本机调用 Gemini"}
+                </p>
+              </div>
+            )}
           </div>
-          <p className="mt-3 text-center text-xs text-[#aaa49a]">
-            {toolData ? `每次生成消耗 ${toolData.integral ?? 10} 积分` : "调试完成后再接入上线扣点流程"}
-          </p>
+          {!sidebarCollapsed && (
+            <p className="mt-3 text-center text-xs text-[#aaa49a]">
+              {toolData ? `每次生成消耗 ${toolData.integral ?? 10} 积分` : "调试完成后再接入上线扣点流程"}
+            </p>
+          )}
         </div>
       </aside>
 
@@ -561,129 +594,130 @@ export default function App() {
                     className="space-y-6"
                   >
                     <div className="grid gap-6 xl:grid-cols-2">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-bold">步骤 1：上传房间场景图</p>
-                          {analysis.elements.length > 0 && (
-                            <span className="text-xs font-semibold text-[#6f6a60]">已识别 {analysis.elements.length} 项</span>
-                          )}
+                      <div className="space-y-6">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-bold">步骤 1：上传房间场景图</p>
+                            {analysis.elements.length > 0 && (
+                              <span className="text-xs font-semibold text-[#6f6a60]">已识别 {analysis.elements.length} 项</span>
+                            )}
+                          </div>
+                          <UploadBox
+                            title="点击或拖拽上传场景图"
+                            hint={UPLOAD_HINT}
+                            image={sceneImage}
+                            onUpload={(image) => {
+                              setSceneImage(image);
+                              resetAnalysis();
+                            }}
+                            tall
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAnalyze}
+                            disabled={!sceneImage || isAnalyzing}
+                            className="flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-[#171819] text-base font-extrabold text-white shadow-sm transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                            {isAnalyzing ? "正在分析场景" : "开始分析按钮"}
+                          </button>
                         </div>
-                        <UploadBox
-                          title="点击或拖拽上传场景图"
-                          hint={UPLOAD_HINT}
-                          image={sceneImage}
-                          onUpload={(image) => {
-                            setSceneImage(image);
-                            resetAnalysis();
-                          }}
-                          tall
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAnalyze}
-                          disabled={!sceneImage || isAnalyzing}
-                          className="flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-[#171819] text-base font-extrabold text-white shadow-sm transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                          {isAnalyzing ? "正在分析场景" : "开始分析按钮"}
-                        </button>
+
+                        <div className="space-y-3">
+                          <p className="text-sm font-bold">步骤 2：上传单人沙发产品图</p>
+                          <UploadBox
+                            title="点击或拖拽上传沙发"
+                            hint={UPLOAD_HINT}
+                            image={productImage}
+                            onUpload={setProductImage}
+                            tall
+                          />
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <p className="text-sm font-bold">步骤 2：上传单人沙发产品图</p>
-                        <UploadBox
-                          title="点击或拖拽上传沙发"
-                          hint={UPLOAD_HINT}
-                          image={productImage}
-                          onUpload={setProductImage}
-                          tall
-                        />
-                      </div>
-                    </div>
-
-                    <section className="rounded-[8px] border border-[#ebe7df] bg-white p-5">
-                      <div className="mb-4 flex items-center justify-between gap-4">
-                        <div>
+                      <section className="rounded-[8px] border border-[#ebe7df] bg-white p-5 shadow-sm">
+                        <div className="mb-4">
                           <p className="text-sm font-extrabold">已识别出的画面元素</p>
                           <p className="mt-1 text-xs text-[#8b8780]">选中=必须保留，取消=必须删除；手动添加=必须新增</p>
                         </div>
+
                         {analysis.placementSuggestion && (
-                          <span className="hidden max-w-[360px] text-right text-xs font-medium text-[#77736b] md:block">
+                          <div className="mb-4 rounded-[8px] bg-[#f2f0ea] px-3 py-2 text-xs font-medium leading-5 text-[#6f6a60]">
                             {analysis.placementSuggestion}
-                          </span>
-                        )}
-                      </div>
-
-                      {analysis.elements.length > 0 && (
-                        <div className="mb-4 grid gap-2 text-xs text-[#5f6466] md:grid-cols-2">
-                          {[
-                            ["光线", analysis.lightingDirection || analysis.lighting],
-                            ["透视", analysis.perspectiveCues || analysis.cameraAngle],
-                            ["大小", analysis.recommendedScale],
-                            ["朝向", analysis.recommendedOrientation],
-                            ...(withModel ? ([["模特", analysis.modelInteractionSuggestion]] as Array<[string, string | undefined]>) : []),
-                          ]
-                            .filter(([, value]) => Boolean(value))
-                            .map(([label, value]) => (
-                              <div key={label} className="rounded-[8px] bg-[#f2f0ea] px-3 py-2">
-                                <span className="font-extrabold text-[#1e2428]">{label}：</span>
-                                {value}
-                              </div>
-                            ))}
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-2">
-                        {analysis.elements.length === 0 ? (
-                          <div className="flex min-h-20 w-full items-center justify-center rounded-[8px] border border-dashed border-[#ddd9d0] text-sm text-[#aaa49a]">
-                            暂无识别结果，请先上传场景并点击分析
                           </div>
-                        ) : (
-                          analysis.elements.map((element) => (
-                            <button
-                              key={element}
-                              type="button"
-                              onClick={() => toggleElement(element)}
-                              className={`rounded-[8px] px-3 py-2 text-sm font-semibold transition-all ${
-                                selectedElements.includes(element)
-                                  ? "bg-[#171819] text-white"
-                                  : "bg-red-50 text-red-700 hover:bg-red-50"
-                              }`}
-                            >
-                              {selectedElements.includes(element) && <Check className="mr-1 inline h-4 w-4" />}
-                              {!selectedElements.includes(element) && <X className="mr-1 inline h-4 w-4" />}
-                              {element}
-                            </button>
-                          ))
                         )}
-                        {addedElements.map((element) => (
-                          <button
-                            key={`added-${element}`}
-                            type="button"
-                            onClick={() => removeAddedElement(element)}
-                            className="rounded-[8px] bg-[#171819] px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-black"
-                            title="点击移除新增物品"
-                          >
-                            <Plus className="mr-1 inline h-4 w-4" />
-                            新增 {element}
-                          </button>
-                        ))}
-                        <div className="flex h-10 items-center gap-2 rounded-[8px] border border-[#ddd9d0] bg-white px-3">
-                          <input
-                            value={manualElement}
-                            onChange={(event) => setManualElement(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") addManualElement();
-                            }}
-                            placeholder="手动添加标签..."
-                            className="w-36 border-0 bg-transparent text-sm outline-none placeholder:text-[#aaa49a]"
-                          />
-                          <button type="button" onClick={addManualElement} className="text-[#77736b] hover:text-[#171819]">
-                            <Plus className="h-4 w-4" />
-                          </button>
+
+                        {analysis.elements.length > 0 && (
+                          <div className="mb-4 space-y-2 text-xs text-[#5f6466]">
+                            {[
+                              ["光线", analysis.lightingDirection || analysis.lighting],
+                              ["透视", analysis.perspectiveCues || analysis.cameraAngle],
+                              ["大小", analysis.recommendedScale],
+                              ["朝向", analysis.recommendedOrientation],
+                              ...(withModel ? ([["模特", analysis.modelInteractionSuggestion]] as Array<[string, string | undefined]>) : []),
+                            ]
+                              .filter(([, value]) => Boolean(value))
+                              .map(([label, value]) => (
+                                <div key={label} className="rounded-[8px] bg-[#f7f5ef] px-3 py-2">
+                                  <span className="font-extrabold text-[#1e2428]">{label}：</span>
+                                  {value}
+                                </div>
+                              ))}
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          {analysis.elements.length === 0 ? (
+                            <div className="flex min-h-[280px] w-full items-center justify-center rounded-[8px] border border-dashed border-[#ddd9d0] px-4 text-center text-sm text-[#aaa49a]">
+                              暂无识别结果，请先上传场景并点击分析
+                            </div>
+                          ) : (
+                            analysis.elements.map((element) => (
+                              <button
+                                key={element}
+                                type="button"
+                                onClick={() => toggleElement(element)}
+                                className={`flex w-full items-center rounded-[8px] px-3 py-2 text-left text-sm font-semibold transition-all ${
+                                  selectedElements.includes(element)
+                                    ? "bg-[#171819] text-white"
+                                    : "bg-red-50 text-red-700 hover:bg-red-50"
+                                }`}
+                              >
+                                {selectedElements.includes(element) && <Check className="mr-2 h-4 w-4 shrink-0" />}
+                                {!selectedElements.includes(element) && <X className="mr-2 h-4 w-4 shrink-0" />}
+                                <span className="min-w-0 truncate">{element}</span>
+                              </button>
+                            ))
+                          )}
+                          {addedElements.map((element) => (
+                            <button
+                              key={`added-${element}`}
+                              type="button"
+                              onClick={() => removeAddedElement(element)}
+                              className="flex w-full items-center rounded-[8px] bg-[#171819] px-3 py-2 text-left text-sm font-semibold text-white transition-all hover:bg-black"
+                              title="点击移除新增物品"
+                            >
+                              <Plus className="mr-2 h-4 w-4 shrink-0" />
+                              <span className="min-w-0 truncate">新增 {element}</span>
+                            </button>
+                          ))}
+                          <div className="flex h-10 items-center gap-2 rounded-[8px] border border-[#ddd9d0] bg-white px-3">
+                            <input
+                              value={manualElement}
+                              onChange={(event) => setManualElement(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") addManualElement();
+                              }}
+                              placeholder="手动添加标签..."
+                              className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-[#aaa49a]"
+                            />
+                            <button type="button" onClick={addManualElement} className="text-[#77736b] hover:text-[#171819]">
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </section>
+                      </section>
+                    </div>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -882,16 +916,6 @@ export default function App() {
               {error && (
                 <div className="rounded-[8px] border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>
               )}
-
-              <section className="rounded-[8px] border border-[#ebe7df] bg-white p-5 shadow-sm">
-                <p className="text-sm font-extrabold">当前任务</p>
-                <div className="mt-3 space-y-2 text-xs leading-5 text-[#6f6a60]">
-                  <p>模式：{mode === "room" ? "上传房间场景融入沙发" : `选择风格直接生成 · ${activeStyle.title}`}</p>
-                  <p>视角：{VIEW_OPTIONS.find((view) => view.id === viewMode)?.label}</p>
-                  <p>模特：{withModel ? "需要模特" : "不需要模特"}</p>
-                  <p>输出：{resolution} / {ratio}</p>
-                </div>
-              </section>
 
               {currentResult && (
                 <section className="rounded-[8px] border border-[#ebe7df] bg-white p-3 shadow-sm">
