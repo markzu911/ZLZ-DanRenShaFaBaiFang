@@ -582,7 +582,7 @@ export default function App() {
                           type="button"
                           onClick={handleAnalyze}
                           disabled={!sceneImage || isAnalyzing}
-                          className="flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-[#8d8a84] text-base font-extrabold text-white shadow-sm transition-all hover:bg-[#171819] disabled:cursor-not-allowed disabled:opacity-45"
+                          className="flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-[#171819] text-base font-extrabold text-white shadow-sm transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
                           {isAnalyzing ? "正在分析场景" : "开始分析按钮"}
